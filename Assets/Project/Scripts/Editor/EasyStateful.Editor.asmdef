@@ -1,0 +1,40 @@
+{
+    "name": "EasyStateful.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:640dfb18a52101a48ad95992ee5a2445"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [
+        "Android",
+        "EmbeddedLinux",
+        "iOS",
+        "LinuxStandalone64",
+        "LinuxStandalone64Server",
+        "CloudRendering",
+        "macOSStandalone",
+        "Switch",
+        "PS4",
+        "PS5",
+        "QNX",
+        "ReservedCFE",
+        "tvOS",
+        "WSA",
+        "VisionOS",
+        "WebGL",
+        "WindowsStandalone32",
+        "WindowsStandalone64",
+        "WindowsStandalone32Server",
+        "WindowsStandalone64Server",
+        "GameCoreXboxOne",
+        "XboxOne",
+        "GameCoreScarlett"
+    ],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
