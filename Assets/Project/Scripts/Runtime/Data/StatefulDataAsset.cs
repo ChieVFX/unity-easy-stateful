@@ -1,7 +1,9 @@
 using UnityEngine;
-
-[CreateAssetMenu(fileName = "NewStatefulData", menuName = "Stateful Animation/Stateful Data Asset")]
-public class StatefulDataAsset : ScriptableObject
-{
-    public UIStateMachine stateMachine;
+    
+namespace EasyStateful.Runtime {
+    [CreateAssetMenu(fileName = "NewStatefulData", menuName = "Stateful Animation/Stateful Data Asset")]
+    public class StatefulDataAsset : ScriptableObject
+    {
+        public UIStateMachine stateMachine;
+    }
 }
