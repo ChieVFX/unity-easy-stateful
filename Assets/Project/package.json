@@ -1,0 +1,27 @@
+{
+    "name": "com.chievfx.easystateful",
+    "version": "0.0.1",
+    "displayName": "Easy Stateful",
+    "description": "An easy framework to fast and efficient state creation for UI(and other purposes) with auomatic tweening. Supports any editor. 1. Add StatefulRoot component to your prefab 2. ??? 3. Profit. For overview, consult this boring youtube video: https://youtu.be/6YopeW-5t0I?si=0dNjr8hNqVXgZ57i",
+    "unity": "2022.3",
+    "documentationUrl": "https://youtu.be/6YopeW-5t0I?si=0dNjr8hNqVXgZ57i",
+    "keywords": [
+        "Easy Stateful",
+        "EasyStateful",
+        "Fast Iteration",
+        "Workflow Tool",
+        "UI/UX framework"
+    ],
+    "author": {
+        "name": "Evgeniy Skvortsov",
+        "email": "chievfx@gmail.com",
+        "url": "https://github.com/chievfx"
+    },
+    "samples": [
+        {
+            "displayName": "Basic Example",
+            "description": "Basic example showing easy stateful functionality in action",
+            "path": "Samples/Basic"
+        }
+    ]
+}
