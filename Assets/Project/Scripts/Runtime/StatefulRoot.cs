@@ -604,6 +604,10 @@ namespace EasyStateful.Runtime {
             }
             if (!Application.isPlaying) EditorUtility.SetDirty(this);
         }
+        #else
+        public void UpdateStateNamesArray()
+        {
+        }
         #endif
 
         private void Update()
