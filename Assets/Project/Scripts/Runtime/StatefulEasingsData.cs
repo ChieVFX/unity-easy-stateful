@@ -484,13 +484,13 @@ namespace EasyStateful.Runtime {
                     }
                 case Stateful.Runtime.Ease.InElastic:
                     {
-                        float[] times = {0f, 0.6f, 0.7f, 0.775f, 0.85f, 0.925f, 0.97f, 1f};
+                        float[] times = {0f, 0.05f, 0.15f, .3f, .45f, 0.6f, 0.7f, 0.775f, 0.85f, 0.925f, 0.97f, 1f};
                         Keyframe[] keys = CreateElasticKeyframes(CalculateInElastic_Val, CalculateInElastic_Deriv, times, flatStartTangent: true);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.OutElastic:
                     {
-                        float[] times = {0f, 0.03f, 0.075f, 0.15f, 0.225f, 0.3f, 0.4f, 1f};
+                        float[] times = {0f, 0.03f, 0.075f, 0.15f, 0.225f, 0.3f, 0.4f, .55f, .7f, 0.85f, 0.95f, 1f};
                         Keyframe[] keys = CreateElasticKeyframes(CalculateOutElastic_Val, CalculateOutElastic_Deriv, times, flatEndTangent: true);
                         return new AnimationCurve(keys);
                     }
