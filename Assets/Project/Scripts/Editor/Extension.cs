@@ -104,18 +104,18 @@ namespace EasyStateful.Editor {
                 return;
             }
 
-            // Access the isLocked property
+            // Access the m_IsLocked field (not property)
             var lockTrackerType = lockTracker.GetType();
-            var isLockedProp = lockTrackerType.GetProperty("isLocked", BindingFlags.Public | BindingFlags.Instance);
-            if (isLockedProp == null)
+            var isLockedBackingField = lockTrackerType.GetField("m_IsLocked", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (isLockedBackingField == null)
             {
-                Debug.LogError("isLocked property not found on LockTracker.");
+                Debug.LogError("m_IsLocked field not found.");
                 return;
             }
 
-            // Set isLocked to true
-            isLockedProp.SetValue(lockTracker, false);
-            Debug.Log("Animation window locked.");
+            // Set isLocked to false
+            isLockedBackingField.SetValue(lockTracker, false);
+            Debug.Log("Animation window unlocked.");
         }
     }
 }

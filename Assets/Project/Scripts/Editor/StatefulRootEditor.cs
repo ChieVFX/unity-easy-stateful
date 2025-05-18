@@ -7,6 +7,7 @@ using System.IO;
 using DG.Tweening;
 using UnityEditorInternal;
 using EasyStateful.Runtime;
+using System.Reflection;
 
 namespace EasyStateful.Editor {
     [CustomEditor(typeof(StatefulRoot))]
@@ -31,6 +32,9 @@ namespace EasyStateful.Editor {
 
         private bool _isShowJustInCase = false;
         private double lastUpdateTime;
+
+        // Add this static field:
+        private static GameObject lastWorkModeGameObject;
 
         void OnEnable()
         {
@@ -346,12 +350,15 @@ namespace EasyStateful.Editor {
             animWindow.recording = true; // Set to record for Work Mode
             animWindow.Focus();
             animWindow.Lock(); // Lock to the current selection (root.gameObject)
+
+            lastWorkModeGameObject = root.gameObject; // Save reference
         }
 
         private void SetAnimations(Animation anim, AnimationClip clip)
         {
             anim.enabled = false;
             anim.playAutomatically = false;
+            clip.legacy = true;
             anim.AddClip(clip, clip.name);
             anim.clip = clip;
             // Set clips to show up in the "Animations" list
@@ -427,6 +434,8 @@ namespace EasyStateful.Editor {
                 animWindow.recording = false;
                 animWindow.Unlock();
             }
+
+            lastWorkModeGameObject = null; // Release reference
         }
 
         private void AddNewStateEvent(string stateName)
@@ -607,6 +616,118 @@ namespace EasyStateful.Editor {
                 File.WriteAllText(savePath, json);
                 AssetDatabase.Refresh(); 
             }
+        }
+
+        // Change FillMissingKeyframes to static and public, and add a menu item
+        [MenuItem("Tools/UI State Machine/Fill blanks &5", priority = 1000)]
+        public static void FillMissingKeyframesMenu()
+        {
+            GameObject targetGO = lastWorkModeGameObject;
+
+            if (targetGO == null)
+            {
+                EditorUtility.DisplayDialog("No Target", "No GameObject is in Work Mode. Please enter Work Mode first.", "OK");
+                return;
+            }
+
+            var root = targetGO.GetComponent<StatefulRoot>();
+            if (root == null)
+            {
+                EditorUtility.DisplayDialog("No StatefulRoot", "Target GameObject does not have a StatefulRoot component.", "OK");
+                return;
+            }
+
+            // Get the editorClip from the component
+            var so = new SerializedObject(root);
+            var editorClipProp = so.FindProperty("editorClip");
+            var clip = editorClipProp.objectReferenceValue as AnimationClip;
+            if (clip == null)
+            {
+                EditorUtility.DisplayDialog("No Animation Clip", "Assign an Animation Clip to the StatefulRoot's 'Editor Clip' field.", "OK");
+                return;
+            }
+
+            FillMissingKeyframes(clip);
+        }
+
+        // Make this static and public so it can be called from the menu
+        public static void FillMissingKeyframes(AnimationClip clip)
+        {
+            Undo.RecordObject(clip, "Fill Missing Keyframes");
+
+            // 1. Gather all float curve bindings and their keyframes at time 0
+            var floatBindings = AnimationUtility.GetCurveBindings(clip);
+            var firstFrameValues = new Dictionary<EditorCurveBinding, float>();
+            foreach (var binding in floatBindings)
+            {
+                var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                float valueAtZero = curve.Evaluate(0f);
+                firstFrameValues[binding] = valueAtZero;
+            }
+
+            // 2. Gather all object reference curve bindings and their keyframes at time 0
+            var objBindings = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+            var firstFrameObjValues = new Dictionary<EditorCurveBinding, UnityEngine.Object>();
+            foreach (var binding in objBindings)
+            {
+                var keyframes = AnimationUtility.GetObjectReferenceCurve(clip, binding);
+                UnityEngine.Object valueAtZero = null;
+                foreach (var kf in keyframes)
+                {
+                    if (Mathf.Approximately(kf.time, 0f))
+                    {
+                        valueAtZero = kf.value;
+                        break;
+                    }
+                }
+                if (valueAtZero == null && keyframes.Length > 0)
+                {
+                    // Use the first keyframe before 0 if available
+                    valueAtZero = keyframes[0].value;
+                }
+                firstFrameObjValues[binding] = valueAtZero;
+            }
+
+            // 3. Get all event times
+            var events = AnimationUtility.GetAnimationEvents(clip);
+            var eventTimes = events.Select(ev => ev.time).Distinct().OrderBy(t => t).ToList();
+
+            // 4. For each event time, ensure all properties have a keyframe
+            foreach (var t in eventTimes)
+            {
+                // Float curves
+                foreach (var binding in floatBindings)
+                {
+                    var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                    bool hasKey = curve.keys.Any(k => Mathf.Approximately(k.time, t));
+                    if (!hasKey && firstFrameValues.TryGetValue(binding, out float v))
+                    {
+                        var keys = curve.keys.ToList();
+                        keys.Add(new Keyframe(t, v));
+                        keys.Sort((a, b) => a.time.CompareTo(b.time));
+                        curve.keys = keys.ToArray();
+                        AnimationUtility.SetEditorCurve(clip, binding, curve);
+                    }
+                }
+
+                // Object reference curves
+                foreach (var binding in objBindings)
+                {
+                    var keyframes = AnimationUtility.GetObjectReferenceCurve(clip, binding).ToList();
+                    bool hasKey = keyframes.Any(kf => Mathf.Approximately(kf.time, t));
+                    if (!hasKey && firstFrameObjValues.TryGetValue(binding, out var objVal))
+                    {
+                        keyframes.Add(new ObjectReferenceKeyframe { time = t, value = objVal });
+                        keyframes.Sort((a, b) => a.time.CompareTo(b.time));
+                        AnimationUtility.SetObjectReferenceCurve(clip, binding, keyframes.ToArray());
+                    }
+                }
+            }
+
+            EditorUtility.SetDirty(clip);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("Filled missing keyframes for all event frames.", clip);
         }
     }
 

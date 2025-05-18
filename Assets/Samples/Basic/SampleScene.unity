@@ -3762,7 +3762,7 @@ MonoBehaviour:
   customDefaultTransitionTime: 0.5
   overrideDefaultEase: 0
   customDefaultEase: 1
-  editorClip: {fileID: 0}
+  editorClip: {fileID: 7400000, guid: f2d4372362b043b44aa62347587540bc, type: 2}
 --- !u!114 &566246817
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -143,6 +143,12 @@ MonoBehaviour:
         propertyName: m_IsActive
         value: 1
         objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
     - name: Initial
       time: 0.016666668
       properties:
@@ -271,6 +277,12 @@ MonoBehaviour:
           Culture=neutral, PublicKeyToken=null
         propertyName: m_IsActive
         value: 0
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 99.78481
         objectReference: 
     - name: Red
       time: 0.033333335
@@ -401,6 +413,12 @@ MonoBehaviour:
         propertyName: m_IsActive
         value: 1
         objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 99.385185
+        objectReference: 
     - name: Hide
       time: 0.050000004
       properties:
@@ -529,4 +547,10 @@ MonoBehaviour:
           Culture=neutral, PublicKeyToken=null
         propertyName: m_IsActive
         value: 1
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 99.17
         objectReference: 
