@@ -11,6 +11,14 @@ public class Test : MonoBehaviour
     private float _time;
     private int _currentState;
 
+    private void Start()
+    {
+        if (statefulRoot == null)
+        {
+            statefulRoot = GetComponent<StatefulRoot>();
+        }
+    }
+
     // Update is called once per frame
     void Update()
     {

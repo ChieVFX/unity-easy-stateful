@@ -10,7 +10,7 @@ Library: C:\__CODE\_public\unity-easy-stateful\Temp\BurstOutput\tempburstlibs\ar
 --generate-link-xml=Temp\burst.link.xml
 --temp-folder=C:\__CODE\_public\unity-easy-stateful\Temp\Burst
 --debug=Full
---key-folder=C:/Program Files/Unity/Hub/Editor/6000.0.38f1/Editor/Data/PlaybackEngines/AndroidPlayer
+--key-folder=C:/Program Files/Unity/Hub/Editor/6000.1.3f1/Editor/Data/PlaybackEngines/AndroidPlayer
 --decode-folder=C:\__CODE\_public\unity-easy-stateful\Library\Burst
 --output=C:\__CODE\_public\unity-easy-stateful\Temp\BurstOutput\tempburstlibs\armeabi-v7a\lib_burst_generated
 --pdb-search-paths=Temp/ManagedSymbols/
@@ -121,7 +121,7 @@ Library: C:\__CODE\_public\unity-easy-stateful\Temp\BurstOutput\tempburstlibs\ar
 --generate-link-xml=Temp\burst.link.xml
 --temp-folder=C:\__CODE\_public\unity-easy-stateful\Temp\Burst
 --debug=Full
---key-folder=C:/Program Files/Unity/Hub/Editor/6000.0.38f1/Editor/Data/PlaybackEngines/AndroidPlayer
+--key-folder=C:/Program Files/Unity/Hub/Editor/6000.1.3f1/Editor/Data/PlaybackEngines/AndroidPlayer
 --decode-folder=C:\__CODE\_public\unity-easy-stateful\Library\Burst
 --output=C:\__CODE\_public\unity-easy-stateful\Temp\BurstOutput\tempburstlibs\armeabi-v7a\lib_burst_generated
 --pdb-search-paths=Temp/ManagedSymbols/
