@@ -13370,6 +13370,18 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 5605326835114514862, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
+      propertyPath: groupSettings
+      value: 
+      objectReference: {fileID: 11400000, guid: a8e1f03b877df4644aec631f51d068d8, type: 2}
+    - target: {fileID: 5605326835114514862, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
+      propertyPath: customDefaultTransitionTime
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5605326835114514862, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
+      propertyPath: overrideDefaultTransitionTime
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5740525771424530030, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
       propertyPath: m_Color.a
       value: 1
