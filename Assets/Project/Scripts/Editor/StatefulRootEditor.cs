@@ -729,6 +729,18 @@ namespace EasyStateful.Editor {
             AssetDatabase.Refresh();
             Debug.Log("Filled missing keyframes for all event frames.", clip);
         }
+
+        [MenuItem("Tools/UI State Machine/Select Work Mode Object &4", priority = 1001)]
+        public static void SelectWorkModeGameObjectMenu()
+        {
+            if (lastWorkModeGameObject == null)
+            {
+                EditorUtility.DisplayDialog("No Work Mode Object", "No GameObject is currently in Work Mode.", "OK");
+                return;
+            }
+            Selection.activeGameObject = lastWorkModeGameObject;
+            EditorGUIUtility.PingObject(lastWorkModeGameObject);
+        }
     }
 
     public class NewStatePrompt : EditorWindow
