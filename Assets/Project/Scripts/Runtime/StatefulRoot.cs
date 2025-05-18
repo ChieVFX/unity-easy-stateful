@@ -55,6 +55,16 @@ namespace EasyStateful.Runtime {
         // Add at class level:
         private Dictionary<(string propertyName, string componentType), PropertyOverrideRule> _propertyOverrideCache;
 
+        // At class level:
+        private struct PropertyTransitionInfo
+        {
+            public float duration;
+            public Ease ease;
+            public bool instantEnableDelayedDisable;
+        }
+
+        private Dictionary<Property, PropertyTransitionInfo> _propertyTransitionCache = new();
+
         [Serializable]
         private class PropertyBinding
         {
@@ -157,6 +167,7 @@ namespace EasyStateful.Runtime {
                 UpdateStateNamesArray(); 
             }
             BuildPropertyOverrideCache();
+            BuildPropertyTransitionCache();
         }
 
         /// <summary>
@@ -174,6 +185,7 @@ namespace EasyStateful.Runtime {
             }
             UpdateStateNamesArray();
             BuildPropertyOverrideCache();
+            BuildPropertyTransitionCache();
         }
 
         /// <summary>
@@ -234,70 +246,64 @@ namespace EasyStateful.Runtime {
 
             foreach (var prop in state.properties)
             {
-                float finalPropDuration = overallDuration;
-                Ease finalPropEase = overallEase;
-
-                var binding = GetOrCreateBinding(prop, out Transform target); // Target transform also available via out param
-                if (binding == null)
+                PropertyTransitionInfo info;
+                if (!_propertyTransitionCache.TryGetValue(prop, out info))
                 {
-                    // GetOrCreateBinding already logs a warning if path/component not found
-                    continue;
+                    // fallback if not found (shouldn't happen)
+                    info.duration = overallDuration;
+                    info.ease = overallEase;
+                    info.instantEnableDelayedDisable = false;
                 }
 
-                PropertyOverrideRule rule = GetPropertyOverrideRule(prop.propertyName, prop.componentType);
+                float finalPropDuration = duration ?? info.duration;
+                Ease finalPropEase = ease ?? info.ease;
                 bool handledBySpecialRule = false;
 
-                if (rule != null)
+                if (info.instantEnableDelayedDisable && prop.propertyName == "m_IsActive")
                 {
-                    if (prop.propertyName == "m_IsActive" && rule.instantEnableDelayedDisable)
+                    if (prop.value > 0.5f)
                     {
-                        if (binding.targetGameObject != null)
+                        if (prop.objectReference != null)
                         {
-                            bool targetActiveState = prop.value > 0.5f;
-                            if (targetActiveState) 
+                            var obj = Resources.Load(prop.objectReference);
+                            if (obj != null)
                             {
-                                binding.targetGameObject.SetActive(true); 
-                            }
-                            else 
-                            {
-                                var gameObjectToDisable = binding.targetGameObject;
-                                DOVirtual.DelayedCall(overallDuration, () => { // Uses overallDuration for delay
-                                    if (gameObjectToDisable != null) gameObjectToDisable.SetActive(false);
-                                }, false)
-                                .SetTarget(this)
-    #if UNITY_EDITOR
-                                .SetUpdate(Application.isPlaying ? UpdateType.Normal : UpdateType.Manual)
-    #endif
-                                ;
+                                prop.objectReference = null;
+                                prop.value = 1f;
                             }
                         }
-                        handledBySpecialRule = true;
                     }
-                    else if (rule.instantEnableDelayedDisable) // For non-m_IsActive properties that should be instant
+                    else
                     {
-                        finalPropDuration = 0f;
-                    }
-                    
-                    if (!handledBySpecialRule)
-                    {
-                        // Apply duration override only if not made instant by 'instantEnableDelayedDisable' for non-m_IsActive
-                        if (!(rule.instantEnableDelayedDisable && prop.propertyName != "m_IsActive"))
+                        if (prop.objectReference != null)
                         {
-                            if (rule.overrideDuration) finalPropDuration = rule.duration;
+                            var obj = Resources.Load(prop.objectReference);
+                            if (obj != null)
+                            {
+                                prop.objectReference = null;
+                                prop.value = 0f;
+                            }
                         }
-                        // Ease can always be overridden if the rule specifies it
-                        if (rule.overrideEase) finalPropEase = rule.ease;
                     }
+                    handledBySpecialRule = true;
                 }
-
+                else if (info.instantEnableDelayedDisable) // For non-m_IsActive properties that should be instant
+                {
+                    finalPropDuration = 0f;
+                }
+                
                 if (handledBySpecialRule)
                 {
                     continue; // Property was fully handled by a special rule
                 }
 
+                // Get the binding for this property
+                var binding = GetOrCreateBinding(prop, out Transform target);
+
+                if (binding == null)
+                    continue;
+
                 bool isObjectRef = !string.IsNullOrEmpty(prop.objectReference) || binding.setterObj != null;
-                // Check if it's m_IsActive (and not the special rule version which was 'continue'd)
-                // binding.targetGameObject check ensures we only consider it if it's a valid GameObject active state property
                 bool isGenericActiveProperty = prop.propertyName == "m_IsActive" && binding.targetGameObject != null;
 
                 if (finalPropDuration == 0f || isObjectRef || isGenericActiveProperty)
@@ -310,16 +316,12 @@ namespace EasyStateful.Runtime {
                     var key = (duration: finalPropDuration, ease: finalPropEase);
                     if (!propertiesToTweenGrouped.ContainsKey(key))
                     {
-                        // For now, still new-ing up inner lists. Pooling these is next if GC remains high from here.
                         propertiesToTweenGrouped[key] = new List<(Property prop, PropertyBinding binding, float initialValue)>();
                     }
                     propertiesToTweenGrouped[key].Add((prop, binding, initialValue));
                 }
                 else
                 {
-                    // This case implies it's not snappable by the above conditions, and not a standard numeric tweenable property.
-                    // e.g. m_IsActive but targetGameObject was somehow null in binding (should be caught earlier by binding creation).
-                    // Or a property that has no setter but also isn't an object ref.
                     Debug.LogWarning($"Property '{prop.propertyName}' on path '{prop.path}' for component type '{prop.componentType}' could not be categorized for tweening or snapping. It may be missing a valid setter or not be an object reference.", this);
                 }
             }
@@ -854,6 +856,38 @@ namespace EasyStateful.Runtime {
                 {
                     var key = (r.propertyName, r.componentType ?? "");
                     _propertyOverrideCache[key] = r;
+                }
+            }
+        }
+
+        private void BuildPropertyTransitionCache()
+        {
+            _propertyTransitionCache.Clear();
+            if (stateMachine == null || stateMachine.states == null) return;
+
+            foreach (var state in stateMachine.states)
+            {
+                foreach (var prop in state.properties)
+                {
+                    // Use your existing logic to resolve duration/ease/instantEnableDelayedDisable
+                    float duration = GetEffectiveTransitionTime();
+                    Ease ease = GetEffectiveEase();
+                    bool instantEnableDelayedDisable = false;
+
+                    var rule = GetPropertyOverrideRule(prop.propertyName, prop.componentType);
+                    if (rule != null)
+                    {
+                        if (rule.overrideDuration) duration = rule.duration;
+                        if (rule.overrideEase) ease = rule.ease;
+                        instantEnableDelayedDisable = rule.instantEnableDelayedDisable;
+                    }
+
+                    _propertyTransitionCache[prop] = new PropertyTransitionInfo
+                    {
+                        duration = duration,
+                        ease = ease,
+                        instantEnableDelayedDisable = instantEnableDelayedDisable
+                    };
                 }
             }
         }
