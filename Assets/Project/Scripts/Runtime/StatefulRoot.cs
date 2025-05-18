@@ -417,7 +417,7 @@ namespace EasyStateful.Runtime {
                         {
                             item.binding.setter(item.binding.component, interpolatedValue);
     #if UNITY_EDITOR
-                            if (!Application.isPlaying) // Only in Editor and not Play Mode
+                            if (!Application.isPlaying && GUI.changed) // Only in Editor and not Play Mode
                             {
                                 // Mark the specific component whose property was changed as dirty.
                                 // This encourages the editor to repaint views that display this component's state.
@@ -445,7 +445,7 @@ namespace EasyStateful.Runtime {
             {
                 binding.targetGameObject.SetActive(prop.value > 0.5f); // Assuming 1 for true, 0 for false
     #if UNITY_EDITOR
-                if (!Application.isPlaying) EditorUtility.SetDirty(binding.targetGameObject);
+                if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.targetGameObject);
     #endif
             }
             else if (!string.IsNullOrEmpty(prop.objectReference) && binding.setterObj != null && binding.component != null)
@@ -460,7 +460,7 @@ namespace EasyStateful.Runtime {
                     Debug.LogError($"Error executing compiled object setter for {prop.propertyName} on {binding.component.GetType().Name} with object {obj?.name} (Path: {prop.objectReference}): {ex.Message}", this);
                 }
     #if UNITY_EDITOR
-                if (!Application.isPlaying) EditorUtility.SetDirty(binding.component);
+                if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.component);
     #endif
             }
             else if (binding.setter != null && binding.component != null)
@@ -474,7 +474,7 @@ namespace EasyStateful.Runtime {
                      Debug.LogError($"Error executing compiled numeric setter for {prop.propertyName} on {binding.component.GetType().Name}: {ex.Message}", this);
                 }
     #if UNITY_EDITOR
-                if (!Application.isPlaying) EditorUtility.SetDirty(binding.component);
+                if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.component);
     #endif
             }
         }
@@ -882,7 +882,7 @@ namespace EasyStateful.Runtime {
             else
                 stateNames = new string[0];
             
-            if (!Application.isPlaying) EditorUtility.SetDirty(this);
+            if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(this);
         }
 
         public void UpdateStateNamesFromClip(AnimationClip clip)
@@ -900,7 +900,7 @@ namespace EasyStateful.Runtime {
             {
                 stateNames = new string[0];
             }
-            if (!Application.isPlaying) EditorUtility.SetDirty(this);
+            if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(this);
         }
         #else
         public void UpdateStateNamesArray()
