@@ -13,6 +13,12 @@ namespace EasyStateful.Runtime {
         private const float ELASTIC_C4 = (2f * Mathf.PI) / 3f;
         private const float ELASTIC_C5 = (2f * Mathf.PI) / 4.5f;
 
+        // Constants for Back Easing
+        private const float BACK_C1 = 1.70158f;
+        private const float BACK_C3 = BACK_C1 + 1f; // Used for InBack and OutBack
+        private const float BACK_C2 = BACK_C1 * 1.525f; // Used for InOutBack overshoot adjustment
+        private const float BACK_C4 = BACK_C2 + 1f; // Used for InOutBack
+
         private void OnValidate()
         {
             if (curves == null || curves.Length != System.Enum.GetValues(typeof(Stateful.Runtime.Ease)).Length)
@@ -150,6 +156,65 @@ namespace EasyStateful.Runtime {
         private static float CalculateInOutElastic_Deriv(float x) {
             if (x == 0f || x == 1f) return 0f;
             return CalculateInOutElastic_Deriv_Internal(x);
+        }
+
+        // InBack easing functions
+        private static float CalculateInBack_Val(float x) {
+            if (x == 0f) return 0f;
+            if (x == 1f) return 1f;
+            return BACK_C3 * x * x * x - BACK_C1 * x * x;
+        }
+        private static float CalculateInBack_Deriv(float x) {
+            // dy/dx = 3 * BACK_C3 * x^2 - 2 * BACK_C1 * x
+            if (x == 0f) return 0f;
+            // if (x == 1f) return BACK_C1 + 3f; // Tangent at x=1
+            return 3f * BACK_C3 * x * x - 2f * BACK_C1 * x;
+        }
+
+        // OutBack easing functions
+        private static float CalculateOutBack_Val(float x) {
+            if (x == 0f) return 0f;
+            if (x == 1f) return 1f;
+            float p = x - 1f;
+            return 1f + BACK_C3 * p * p * p + BACK_C1 * p * p;
+        }
+        private static float CalculateOutBack_Deriv(float x) {
+            // dy/dx = 3 * BACK_C3 * (x-1)^2 + 2 * BACK_C1 * (x-1)
+            if (x == 1f) return 0f;
+            // if (x == 0f) return BACK_C1 + 3f; // Tangent at x=0
+            float p = x - 1f;
+            return 3f * BACK_C3 * p * p + 2f * BACK_C1 * p;
+        }
+
+        // InOutBack easing functions
+        private static float CalculateInOutBack_Val(float x) {
+            if (x == 0f) return 0f;
+            if (x == 1f) return 1f;
+            if (x < 0.5f) {
+                float t = x * 2f;
+                return 0.5f * (t * t * (BACK_C4 * t - BACK_C2));
+            } else {
+                float t = (x * 2f) - 2f;
+                return 0.5f * (t * t * (BACK_C4 * t + BACK_C2) + 2f);
+            }
+        }
+        private static float CalculateInOutBack_Deriv(float x) {
+            // dy/dx for x < 0.5: 12 * BACK_C4 * x^2 - 4 * BACK_C2 * x
+            // dy/dx for x >= 0.5: 3 * BACK_C4 * (2x-2)^2 + 2 * BACK_C2 * (2x-2)
+            if (x == 0f || x == 1f) return 0f;
+            
+            if (x < 0.5f) {
+                // Original formula: 0.5 * ( (c2+1) * 8x^3 - c2 * 4x^2 )'
+                // y = 4 * (c2+1) * x^3 - 2 * c2 * x^2
+                // dy/dx = 12 * (c2+1) * x^2 - 4 * c2 * x
+                // Here, c2 is BACK_C2, (c2+1) is BACK_C4
+                return 12f * BACK_C4 * x * x - 4f * BACK_C2 * x;
+            } else {
+                // Original formula: 0.5 * ( (c2+1)*(2x-2)^3 + c2*(2x-2)^2 + 2 )'
+                // dy/dx = (c2+1) * 3 * (2x-2)^2 + c2 * 2 * (2x-2)
+                float t = (x * 2f) - 2f;
+                return 3f * BACK_C4 * t * t + 2f * BACK_C2 * t;
+            }
         }
 
         public static AnimationCurve GetDefaultCurve(Stateful.Runtime.Ease ease)
@@ -498,6 +563,36 @@ namespace EasyStateful.Runtime {
                     {
                         float[] times = {0f, 0.05f, 0.15f, 0.25f, 0.35f, 0.44375f, 0.5f, 0.55625f, 0.65f, 0.75f, 0.85f, 0.95f, 1f};
                         Keyframe[] keys = CreateElasticKeyframes(CalculateInOutElastic_Val, CalculateInOutElastic_Deriv, times, flatStartTangent: true, flatEndTangent: true);
+                        return new AnimationCurve(keys);
+                    }
+                case Stateful.Runtime.Ease.InBack:
+                    {
+                        float overshootTime = (2f * BACK_C1) / (3f * BACK_C3); // approx 0.4199f
+                        // Added 0.1f to help maintain initial flatness
+                        float[] times = {0f, 0.1f, overshootTime, overshootTime + (1f - overshootTime) * 0.5f, 1f}; 
+                        Keyframe[] keys = CreateElasticKeyframes(CalculateInBack_Val, CalculateInBack_Deriv, times, flatStartTangent: true, flatEndTangent: false);
+                        return new AnimationCurve(keys);
+                    }
+                case Stateful.Runtime.Ease.OutBack:
+                    {
+                        float overshootCalc = (2f * BACK_C1) / (3f * BACK_C3);
+                        float overshootTime = 1f - overshootCalc; // approx 0.5801f
+                        // Added 0.9f to help maintain final flatness
+                        float[] times = {0f, overshootTime * 0.5f, overshootTime, 0.9f, 1f}; 
+                        Keyframe[] keys = CreateElasticKeyframes(CalculateOutBack_Val, CalculateOutBack_Deriv, times, flatStartTangent: false, flatEndTangent: true);
+                        return new AnimationCurve(keys);
+                    }
+                case Stateful.Runtime.Ease.InOutBack:
+                    {
+                        float overshoot1Time = BACK_C2 / (3f * BACK_C4); // approx 0.2406f (time of first max overshoot for the 0-0.5 part, scaled to 0-0.5)
+                        float actualOvershoot1Time = overshoot1Time * 0.5f; // Scaled to 0-1 range for x
+                        
+                        float overshoot2TimeRelative = BACK_C2 / (3f * BACK_C4); // Same relative overshoot point for the 0.5-1 part
+                        float actualOvershoot2Time = 0.5f + (overshoot2TimeRelative * 0.5f); // Scaled and shifted for 0-1 range for x
+
+                        // Added 0.05f and 0.95f for initial/final flatness
+                        float[] times = {0f, 0.05f, actualOvershoot1Time, 0.5f, actualOvershoot2Time, 0.95f, 1f};
+                        Keyframe[] keys = CreateElasticKeyframes(CalculateInOutBack_Val, CalculateInOutBack_Deriv, times, flatStartTangent: true, flatEndTangent: true);
                         return new AnimationCurve(keys);
                     }
                 // For Elastic, Back, Bounce, Flash, etc., you may want to use custom or hand-tuned curves or leave as linear for now.
