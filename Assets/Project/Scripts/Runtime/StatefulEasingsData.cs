@@ -31,7 +31,58 @@ namespace EasyStateful.Runtime {
         public static AnimationCurve GetDefaultCurve(Stateful.Runtime.Ease ease)
         {
             const float PI = Mathf.PI;
-            const float BIG_TANGENT = 100f; // Used for "infinite" derivatives
+            const float BIG_TANGENT = 100f; // Used for "infinite" or very large derivatives
+
+            // Local static functions for derivative calculations
+            static float CalculateInCirc_Val(float x) {
+                return 1f - Mathf.Sqrt(Mathf.Max(0f, 1f - x * x));
+            }
+            static float CalculateInCirc_Deriv(float x) {
+                if (x <= 0f) return 0f; // Derivative at x=0 is 0
+                if (x >= 1f) return BIG_TANGENT; // Derivative at x=1 is infinite
+                float val_in_sqrt = 1f - x * x;
+                if (val_in_sqrt < 1e-7f) return BIG_TANGENT;
+                return Mathf.Min(BIG_TANGENT, x / Mathf.Sqrt(val_in_sqrt));
+            }
+
+            static float CalculateOutCirc_Val(float x) {
+                float term_1_minus_x = 1f - x;
+                return Mathf.Sqrt(Mathf.Max(0f, 1f - term_1_minus_x * term_1_minus_x));
+            }
+            static float CalculateOutCirc_Deriv(float x) {
+                if (x <= 0f) return BIG_TANGENT; // Derivative at x=0 is infinite
+                if (x >= 1f) return 0f; // Derivative at x=1 is 0
+                float term_1_minus_x = 1f - x;
+                float val_in_sqrt = 1f - term_1_minus_x * term_1_minus_x;
+                if (val_in_sqrt < 1e-7f) return BIG_TANGENT;
+                return Mathf.Min(BIG_TANGENT, term_1_minus_x / Mathf.Sqrt(val_in_sqrt));
+            }
+            
+            static float CalculateInOutCirc_Val(float x) {
+                if (x < 0.5f) {
+                    float term_2x = 2f * x;
+                    return (1f - Mathf.Sqrt(Mathf.Max(0f, 1f - term_2x * term_2x))) / 2f;
+                } else {
+                    float term_2x_minus_2 = 2f * x - 2f;
+                    return (Mathf.Sqrt(Mathf.Max(0f, 1f - term_2x_minus_2 * term_2x_minus_2)) + 1f) / 2f;
+                }
+            }
+            static float CalculateInOutCirc_Deriv(float x) {
+                if (x == 0f || x == 1f) return 0f;
+                if (Mathf.Approximately(x, 0.5f)) return BIG_TANGENT;
+
+                if (x < 0.5f) {
+                    float term_2x = 2f * x;
+                    float val_in_sqrt = 1f - term_2x * term_2x;
+                    if (val_in_sqrt < 1e-7f) return BIG_TANGENT;
+                    return Mathf.Min(BIG_TANGENT, term_2x / Mathf.Sqrt(val_in_sqrt));
+                } else { // x > 0.5f
+                    float term_2x_minus_2 = 2f * x - 2f;
+                    float val_in_sqrt = 1f - term_2x_minus_2 * term_2x_minus_2;
+                    if (val_in_sqrt < 1e-7f) return BIG_TANGENT;
+                    return Mathf.Min(BIG_TANGENT, (2f - 2f * x) / Mathf.Sqrt(val_in_sqrt));
+                }
+            }
 
             switch (ease)
             {
@@ -182,6 +233,7 @@ namespace EasyStateful.Runtime {
                         float x = expoKeys3[i];
                         float y;
                         float key_inTangent = 0f, key_outTangent = 0f;
+                        float key_inWeight = 1/3f, key_outWeight = 1/3f;
                         
                         if (x == 0f) { 
                             y = 0f; 
@@ -212,132 +264,103 @@ namespace EasyStateful.Runtime {
                             key_inTangent = tangentValue;
                             key_outTangent = tangentValue;
                         }
-                        expoFrames3[i] = new Keyframe(x, y, key_inTangent, key_outTangent);
+
+                        // Set weights for expo (generally smooth, but flat at ends)
+                        if (Mathf.Approximately(key_inTangent, 0f)) key_inWeight = 0f;
+                        if (Mathf.Approximately(key_outTangent, 0f)) key_outWeight = 0f;
+                        
+                        expoFrames3[i] = new Keyframe(x, y, key_inTangent, key_outTangent, key_inWeight, key_outWeight);
+                        expoFrames3[i].weightedMode = WeightedMode.Both;
                     }
                     return new AnimationCurve(expoFrames3);
                 case Stateful.Runtime.Ease.InCirc:
-                    // y = 1 - sqrt(1 - x^2)
-                    // dy/dx = x/sqrt(1-x^2)
                     {
-                        Keyframe[] keys = new Keyframe[5];
-                        float x_val, y_val, dy_val;
+                        float[] times = {0f, 0.25f, 0.5f, 0.75f, 0.9f, 0.95f, 0.99f, 1f};
+                        Keyframe[] keys = new Keyframe[times.Length];
+                        for(int i=0; i < times.Length; ++i)
+                        {
+                            float t = times[i];
+                            float val = CalculateInCirc_Val(t);
+                            float deriv_val = CalculateInCirc_Deriv(t);
+                            
+                            float inT, outT;
+                            float inW = 1/3f, outW = 1/3f;
 
-                        // Key 0: x=0
-                        x_val = 0f;
-                        y_val = 0f;
-                        dy_val = 0f;
-                        keys[0] = new Keyframe(x_val, y_val, dy_val, dy_val);
+                            if (t == 0f) {
+                                inT = 0f; outT = 0f; // Start is flat
+                            } else if (t == 1f) {
+                                inT = deriv_val; // deriv_val will be BIG_TANGENT
+                                outT = 0f;      // End is flat out
+                            } else {
+                                inT = deriv_val;
+                                outT = deriv_val;
+                            }
 
-                        // Key 1: x=0.5
-                        x_val = 0.5f;
-                        y_val = 1f - Mathf.Sqrt(1f - x_val * x_val);
-                        dy_val = x_val / Mathf.Max(1e-6f, Mathf.Sqrt(1f - x_val * x_val));
-                        keys[1] = new Keyframe(x_val, y_val, dy_val, dy_val);
-                        
-                        // Key 2: x=0.8
-                        x_val = 0.8f;
-                        y_val = 1f - Mathf.Sqrt(1f - x_val * x_val);
-                        dy_val = x_val / Mathf.Max(1e-6f, Mathf.Sqrt(1f - x_val * x_val));
-                        keys[2] = new Keyframe(x_val, y_val, dy_val, dy_val);
-
-                        // Key 3: x=0.95
-                        x_val = 0.95f;
-                        y_val = 1f - Mathf.Sqrt(1f - x_val * x_val);
-                        dy_val = x_val / Mathf.Max(1e-6f, Mathf.Sqrt(1f - x_val * x_val));
-                        keys[3] = new Keyframe(x_val, y_val, dy_val, dy_val);
-                        
-                        // Key 4: x=1
-                        float x_near_1 = 0.999f; // Calculate tangent near end
-                        float dy_near_1 = x_near_1 / Mathf.Max(1e-6f, Mathf.Sqrt(1f - x_near_1*x_near_1));
-                        keys[4] = new Keyframe(1f, 1f, Mathf.Min(dy_near_1, BIG_TANGENT), 0f);
-                        
+                            if (Mathf.Approximately(inT, 0f) || Mathf.Approximately(inT, BIG_TANGENT)) inW = 0f;
+                            if (Mathf.Approximately(outT, 0f) || Mathf.Approximately(outT, BIG_TANGENT)) outW = 0f;
+                            
+                            keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
+                            keys[i].weightedMode = WeightedMode.Both;
+                        }
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.OutCirc:
-                    // y = sqrt(1 - (1-x)^2)
-                    // dy/dx = (1-x)/sqrt(1-(1-x)^2)
                      {
-                        Keyframe[] keys = new Keyframe[5];
-                        float x_val, y_val, dy_val, term_1_minus_x;
+                        float[] times = {0f, 0.01f, 0.05f, 0.1f, 0.25f, 0.5f, 0.75f, 1f};
+                        Keyframe[] keys = new Keyframe[times.Length];
+                        for(int i=0; i < times.Length; ++i)
+                        {
+                            float t = times[i];
+                            float val = CalculateOutCirc_Val(t);
+                            float deriv_val = CalculateOutCirc_Deriv(t);
 
-                        // Key 0: x=0
-                        float x_near_0 = 0.001f; // Calculate tangent near start
-                        term_1_minus_x = 1f - x_near_0;
-                        float dy_near_0 = term_1_minus_x / Mathf.Max(1e-6f, Mathf.Sqrt(1f - term_1_minus_x*term_1_minus_x));
-                        keys[0] = new Keyframe(0f, 0f, 0f, Mathf.Min(dy_near_0, BIG_TANGENT));
+                            float inT, outT;
+                            float inW = 1/3f, outW = 1/3f;
 
-                        // Key 1: x=0.05
-                        x_val = 0.05f;
-                        term_1_minus_x = 1f - x_val;
-                        y_val = Mathf.Sqrt(1f - term_1_minus_x*term_1_minus_x);
-                        dy_val = term_1_minus_x / Mathf.Max(1e-6f, Mathf.Sqrt(1f - term_1_minus_x*term_1_minus_x));
-                        keys[1] = new Keyframe(x_val, y_val, dy_val, dy_val);
-                        
-                        // Key 2: x=0.2
-                        x_val = 0.2f;
-                        term_1_minus_x = 1f - x_val;
-                        y_val = Mathf.Sqrt(1f - term_1_minus_x*term_1_minus_x);
-                        dy_val = term_1_minus_x / Mathf.Max(1e-6f, Mathf.Sqrt(1f - term_1_minus_x*term_1_minus_x));
-                        keys[2] = new Keyframe(x_val, y_val, dy_val, dy_val);
+                            if (t == 0f) {
+                                inT = 0f;       // Start is flat in
+                                outT = deriv_val; // deriv_val will be BIG_TANGENT
+                            } else if (t == 1f) {
+                                inT = 0f; outT = 0f; // End is flat
+                            } else {
+                                inT = deriv_val;
+                                outT = deriv_val;
+                            }
+                            
+                            if (Mathf.Approximately(inT, 0f) || Mathf.Approximately(inT, BIG_TANGENT)) inW = 0f;
+                            if (Mathf.Approximately(outT, 0f) || Mathf.Approximately(outT, BIG_TANGENT)) outW = 0f;
 
-                        // Key 3: x=0.5
-                        x_val = 0.5f;
-                        term_1_minus_x = 1f - x_val;
-                        y_val = Mathf.Sqrt(1f - term_1_minus_x*term_1_minus_x);
-                        dy_val = term_1_minus_x / Mathf.Max(1e-6f, Mathf.Sqrt(1f - term_1_minus_x*term_1_minus_x));
-                        keys[3] = new Keyframe(x_val, y_val, dy_val, dy_val);
-                        
-                        // Key 4: x=1
-                        keys[4] = new Keyframe(1f, 1f, 0f, 0f);
-                        
+                            keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
+                            keys[i].weightedMode = WeightedMode.Both;
+                        }
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.InOutCirc:
-                    float[] circKeys3 = {0f, 0.05f, 0.1f, 0.2f, 0.3f, 0.5f, 0.7f, 0.8f, 0.9f, 0.95f, 1f};
-                    Keyframe[] circFrames3 = new Keyframe[circKeys3.Length];
-                    for (int i = 0; i < circKeys3.Length; i++) {
-                        float x = circKeys3[i];
-                        float y;
-                        float key_inTangent = 0f, key_outTangent = 0f;
+                    {
+                        float[] times = {0f, 0.1f, 0.25f, 0.4f, 0.45f, 0.49f, 0.5f, 0.51f, 0.55f, 0.6f, 0.75f, 0.9f, 1f};
+                        Keyframe[] keys = new Keyframe[times.Length];
+                        for(int i=0; i < times.Length; ++i)
+                        {
+                            float t = times[i];
+                            float val = CalculateInOutCirc_Val(t);
+                            float deriv_val = CalculateInOutCirc_Deriv(t);
+                            
+                            float inT = deriv_val, outT = deriv_val;
+                            float inW = 1/3f, outW = 1/3f;
 
-                        if (x == 0f) { 
-                            y = 0f; 
-                            key_inTangent = 0f;
-                            key_outTangent = 0f; 
-                        }
-                        else if (x == 1f) { 
-                            y = 1f; 
-                            key_inTangent = 0f; 
-                            key_outTangent = 0f;
-                        }
-                        else { 
-                            float tangentValue;
-                            if (x < 0.5f) {
-                                // y = (1 - sqrt(1 - (2x)^2)) / 2
-                                // dy/dx = (2x) / sqrt(1 - (2x)^2)
-                                float term_2x = 2f * x;
-                                float val_in_sqrt = 1f - term_2x * term_2x;
-                                y = (1f - Mathf.Sqrt(Mathf.Max(0f, val_in_sqrt))) / 2f;
-                                if (val_in_sqrt < 1e-6f) tangentValue = BIG_TANGENT;
-                                else tangentValue = term_2x / Mathf.Sqrt(val_in_sqrt);
-                            } else if (x > 0.5f) {
-                                // y = (sqrt(1 - (-2x+2)^2) + 1) / 2
-                                // dy/dx = (2-2x) / sqrt(1 - (-2x+2)^2)
-                                float term_2x_minus_2 = 2f * x - 2f;
-                                float val_in_sqrt = 1f - term_2x_minus_2 * term_2x_minus_2;
-                                y = (Mathf.Sqrt(Mathf.Max(0f, val_in_sqrt)) + 1f) / 2f;
-                                if (val_in_sqrt < 1e-6f) tangentValue = BIG_TANGENT;
-                                else tangentValue = (2f - 2f*x) / Mathf.Sqrt(val_in_sqrt);
-                            } else { // x == 0.5
-                                y = 0.5f;
-                                tangentValue = BIG_TANGENT; 
+                            if(t == 0f || t == 1f) { // Start and End are flat
+                                inT = 0f; outT = 0f;
                             }
-                            key_inTangent = Mathf.Min(tangentValue, BIG_TANGENT); // Ensure tangent doesn't exceed BIG_TANGENT
-                            key_outTangent = Mathf.Min(tangentValue, BIG_TANGENT);
+                            // For t = 0.5f, deriv_val is already BIG_TANGENT from CalculateInOutCirc_Deriv
+
+                            if (Mathf.Approximately(inT, 0f) || Mathf.Approximately(inT, BIG_TANGENT)) inW = 0f;
+                            if (Mathf.Approximately(outT, 0f) || Mathf.Approximately(outT, BIG_TANGENT)) outW = 0f;
+                            
+                            keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
+                            keys[i].weightedMode = WeightedMode.Both;
                         }
-                        circFrames3[i] = new Keyframe(x, y, key_inTangent, key_outTangent);
+                        return new AnimationCurve(keys);
                     }
-                    return new AnimationCurve(circFrames3);
                 // For Elastic, Back, Bounce, Flash, etc., you may want to use custom or hand-tuned curves or leave as linear for now.
                 default:
                     return AnimationCurve.Linear(0, 0, 1, 1);
