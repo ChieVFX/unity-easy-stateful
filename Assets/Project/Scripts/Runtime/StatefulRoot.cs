@@ -40,7 +40,7 @@ namespace EasyStateful.Runtime {
         public Ease customDefaultEase = Ease.Linear;
 
         // Cache per-path and per-property binding info for fast reflection
-        private Dictionary<string, Dictionary<string, PropertyBinding>> bindingCache = new Dictionary<string, Dictionary<string, PropertyBinding>>();
+        private Dictionary<string, Dictionary<(string componentType, string propertyName), PropertyBinding>> bindingCache = new();
         
         // Pooled collections for TweenToState to reduce GC
         private List<Property> _pooledPropertiesToSnap = new List<Property>();
@@ -48,6 +48,12 @@ namespace EasyStateful.Runtime {
         // and the dictionary itself. Full pooling of inner lists is more complex and can be a later step if needed.
         private Dictionary<(float duration, Ease ease), List<(Property prop, PropertyBinding binding, float initialValue)>> _pooledPropertiesToTweenGrouped =
             new Dictionary<(float, Ease), List<(Property, PropertyBinding, float)>>();
+
+        // Add at class level:
+        private static Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
+
+        // Add at class level:
+        private Dictionary<(string propertyName, string componentType), PropertyOverrideRule> _propertyOverrideCache;
 
         [Serializable]
         private class PropertyBinding
@@ -127,36 +133,15 @@ namespace EasyStateful.Runtime {
         /// </summary>
         private PropertyOverrideRule GetPropertyOverrideRule(string propertyName, string componentTypeFullName)
         {
-            // Tier 1: Group Settings Property Override
-            if (groupSettings != null && groupSettings.propertyOverrides != null)
+            // Tier 1: Group Settings Property Override (cached)
+            if (_propertyOverrideCache != null)
             {
-                // Check for specific rule (component type match)
-                for (int i = 0; i < groupSettings.propertyOverrides.Count; i++)
-                {
-                    var r = groupSettings.propertyOverrides[i];
-                    if (r.propertyName == propertyName &&
-                        !string.IsNullOrEmpty(r.componentType) &&
-                        r.componentType == componentTypeFullName)
-                    {
-                        return r;
-                    }
-                }
-                // Check for general rule (no component type specified, matches any)
-                for (int i = 0; i < groupSettings.propertyOverrides.Count; i++)
-                {
-                    var r = groupSettings.propertyOverrides[i];
-                    if (r.propertyName == propertyName &&
-                        string.IsNullOrEmpty(r.componentType))
-                    {
-                        return r;
-                    }
-                }
+                if (_propertyOverrideCache.TryGetValue((propertyName, componentTypeFullName), out var rule))
+                    return rule;
+                if (_propertyOverrideCache.TryGetValue((propertyName, ""), out rule))
+                    return rule;
             }
-
             // Tier 2: Global Settings Property Override
-            // (Assuming StatefulGlobalSettings.GetGlobalPropertyOverrideRule is already efficient or its list is small)
-            // If StatefulGlobalSettings also uses a List and FirstOrDefault, it should be refactored similarly.
-            // For now, only changing the local part.
             return StatefulGlobalSettings.GetGlobalPropertyOverrideRule(propertyName, componentTypeFullName);
         }
 
@@ -171,6 +156,7 @@ namespace EasyStateful.Runtime {
                 stateMachine = new UIStateMachine();
                 UpdateStateNamesArray(); 
             }
+            BuildPropertyOverrideCache();
         }
 
         /// <summary>
@@ -187,6 +173,7 @@ namespace EasyStateful.Runtime {
                 stateMachine = dataAsset.stateMachine;
             }
             UpdateStateNamesArray();
+            BuildPropertyOverrideCache();
         }
 
         /// <summary>
@@ -449,11 +436,11 @@ namespace EasyStateful.Runtime {
 
             if (!bindingCache.TryGetValue(prop.path, out var compMap))
             {
-                compMap = new Dictionary<string, PropertyBinding>();
+                compMap = new Dictionary<(string, string), PropertyBinding>();
                 bindingCache[prop.path] = compMap;
             }
 
-            string cacheKey = $"{prop.componentType}_{prop.propertyName}";
+            var cacheKey = (prop.componentType, prop.propertyName);
             if (compMap.TryGetValue(cacheKey, out var binding))
             {
                 return binding;
@@ -475,7 +462,13 @@ namespace EasyStateful.Runtime {
                 return binding;
             }
 
-            var compType = Type.GetType(prop.componentType);
+            // Type caching
+            if (!_typeCache.TryGetValue(prop.componentType, out var compType))
+            {
+                compType = Type.GetType(prop.componentType);
+                if (compType != null)
+                    _typeCache[prop.componentType] = compType;
+            }
             if (compType == null)
             {
                 Debug.LogWarning($"Component type not found: {prop.componentType} for path {prop.path}, property {prop.propertyName}", this);
@@ -570,9 +563,9 @@ namespace EasyStateful.Runtime {
                 if (prop.propertyName.Contains("."))
                 {
                     binding.isSubProperty = true;
-                    var parts = prop.propertyName.Split('.');
-                    var mainName = parts[0];
-                    var subName = parts[1];
+                    int dotIdx = prop.propertyName.IndexOf('.');
+                    string mainName = prop.propertyName.Substring(0, dotIdx);
+                    string subName = prop.propertyName.Substring(dotIdx + 1);
 
                     binding.mainPropInfo = compType.GetProperty(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                     if (binding.mainPropInfo == null) binding.mainFieldInfo = compType.GetField(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -848,6 +841,19 @@ namespace EasyStateful.Runtime {
                 {
                     // TweenToState will use GetEffectiveTransitionTime and GetEffectiveEase
                     TweenToState(stateNames[currentStateIndex]); 
+                }
+            }
+        }
+
+        private void BuildPropertyOverrideCache()
+        {
+            _propertyOverrideCache = new Dictionary<(string, string), PropertyOverrideRule>();
+            if (groupSettings != null && groupSettings.propertyOverrides != null)
+            {
+                foreach (var r in groupSettings.propertyOverrides)
+                {
+                    var key = (r.propertyName, r.componentType ?? "");
+                    _propertyOverrideCache[key] = r;
                 }
             }
         }
