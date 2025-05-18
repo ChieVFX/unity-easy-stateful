@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cefcc61c5dace6e4fac314dda8237567, type: 3}
+  m_Name: Test2_StateData
+  m_EditorClassIdentifier: 
+  stateMachine:
+    states:
+    - name: Default
+      time: 0
+      properties:
+      - path: 
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 1
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+    - name: Hidden
+      time: 0.016666668
+      properties:
+      - path: 
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 10
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 0
+        objectReference: 
