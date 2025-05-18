@@ -32,8 +32,6 @@ namespace EasyStateful.Editor {
                 SerializedProperty compType = property.FindPropertyRelative("componentType");
                 SerializedProperty overrideEaseProp = property.FindPropertyRelative("overrideEase");
                 SerializedProperty easeProp = property.FindPropertyRelative("ease");
-                SerializedProperty overrideDurationProp = property.FindPropertyRelative("overrideDuration");
-                SerializedProperty durationProp = property.FindPropertyRelative("duration");
                 SerializedProperty instantEnableDelayedDisableProp = property.FindPropertyRelative("instantEnableDelayedDisable");
 
                 EditorGUI.PropertyField(currentRect, propName);
@@ -54,9 +52,6 @@ namespace EasyStateful.Editor {
 
                 if (showStandardOverrides)
                 {
-                    // Override Duration
-                    DrawOverrideableProperty(ref currentRect, overrideDurationProp, durationProp, "Duration");
-
                     // Override Ease
                     DrawOverrideableProperty(ref currentRect, overrideEaseProp, easeProp, "Ease");
                 }
@@ -89,14 +84,13 @@ namespace EasyStateful.Editor {
                 height += EditorGUIUtility.standardVerticalSpacing; // Space after foldout
                 
                 height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing) * 2; // propName, compType
-                height += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing; // "Instant Change" line
+                height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing); // "Instant Change" line
 
                 SerializedProperty instantEnableDelayedDisableProp = property.FindPropertyRelative("instantEnableDelayedDisable");
                 bool showStandardOverrides = !instantEnableDelayedDisableProp.boolValue;
 
                 if (showStandardOverrides)
                 {
-                    height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing); // Duration line
                     height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing); // Ease line
                 }
             }

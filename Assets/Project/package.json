@@ -1,6 +1,6 @@
 {
     "name": "com.chievfx.easystateful",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "displayName": "Easy Stateful",
     "description": "An easy framework to fast and efficient state creation for UI(and other purposes) with auomatic tweening. Supports any editor. 1. Add StatefulRoot component to your prefab 2. ??? 3. Profit. For overview, consult this boring youtube video: https://youtu.be/6YopeW-5t0I?si=0dNjr8hNqVXgZ57i",
     "unity": "2022.3",

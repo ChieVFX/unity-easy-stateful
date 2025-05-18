@@ -10,8 +10,6 @@ namespace EasyStateful.Runtime {
         public string componentType = ""; // Optional: Full name, e.g., UnityEngine.UI.Image
         public bool overrideEase = false;
         public Ease ease = Ease.Linear;
-        public bool overrideDuration = false;
-        public float duration = 0.5f;
 
         // This is the primary toggle for "Instant Change" behavior in UI and logic
         public bool instantEnableDelayedDisable = false;

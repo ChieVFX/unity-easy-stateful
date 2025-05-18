@@ -46,8 +46,8 @@ namespace EasyStateful.Runtime {
         private List<Property> _pooledPropertiesToSnap = new List<Property>();
         // For _pooledPropertiesToTweenGrouped, we'll start by clearing its internal lists if they exist,
         // and the dictionary itself. Full pooling of inner lists is more complex and can be a later step if needed.
-        private Dictionary<(float duration, Ease ease), List<(Property prop, PropertyBinding binding, float initialValue)>> _pooledPropertiesToTweenGrouped =
-            new Dictionary<(float, Ease), List<(Property, PropertyBinding, float)>>();
+        private Dictionary<Ease, List<(Property prop, PropertyBinding binding, float initialValue)>> _pooledPropertiesToTweenGrouped =
+            new Dictionary<Ease, List<(Property, PropertyBinding, float)>>();
 
         // Add at class level:
         private static Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
@@ -256,22 +256,31 @@ namespace EasyStateful.Runtime {
             #endif
 
             List<Property> propertiesToSnap;
-            Dictionary<(float duration, Ease ease), List<(Property prop, PropertyBinding binding, float initialValue)>> propertiesToTweenGrouped;
+            Dictionary<Ease, List<(Property prop, PropertyBinding binding, float initialValue)>> propertiesToTweenGrouped;
 
             if (usePooling)
             {
                 _pooledPropertiesToSnap.Clear();
                 propertiesToSnap = _pooledPropertiesToSnap;
 
-                foreach (var list in _pooledPropertiesToTweenGrouped.Values)
-                    list.Clear();
-                _pooledPropertiesToTweenGrouped.Clear();
-                propertiesToTweenGrouped = _pooledPropertiesToTweenGrouped;
+                // Change pooled dictionary type if needed
+                if (_pooledPropertiesToTweenGrouped is Dictionary<Ease, List<(Property, PropertyBinding, float)>> pooledByEase)
+                {
+                    foreach (var list in pooledByEase.Values)
+                        list.Clear();
+                    pooledByEase.Clear();
+                    propertiesToTweenGrouped = pooledByEase;
+                }
+                else
+                {
+                    propertiesToTweenGrouped = new Dictionary<Ease, List<(Property, PropertyBinding, float)>>();
+                    _pooledPropertiesToTweenGrouped = (Dictionary<Ease, List<(Property, PropertyBinding, float)>>)(object)propertiesToTweenGrouped;
+                }
             }
             else
             {
                 propertiesToSnap = new List<Property>();
-                propertiesToTweenGrouped = new Dictionary<(float, Ease), List<(Property, PropertyBinding, float)>>();
+                propertiesToTweenGrouped = new Dictionary<Ease, List<(Property, PropertyBinding, float)>>();
             }
 
             foreach (var prop in state.properties)
@@ -303,7 +312,6 @@ namespace EasyStateful.Runtime {
                         {
                             finalPropDuration = 0f;
                         }
-                        if (rule.overrideDuration) finalPropDuration = rule.duration;
                         if (rule.overrideEase) finalPropEase = rule.ease;
                     }
                 }
@@ -376,7 +384,7 @@ namespace EasyStateful.Runtime {
                 else if (binding.setter != null && binding.component != null && binding.getter != null) // Numeric, tweenable property
                 {
                     float initialValue = GetCurrentValue(binding);
-                    var key = (duration: finalPropDuration, ease: finalPropEase);
+                    var key = finalPropEase;
                     if (!propertiesToTweenGrouped.ContainsKey(key))
                     {
                         propertiesToTweenGrouped[key] = new List<(Property prop, PropertyBinding binding, float initialValue)>();
@@ -398,40 +406,36 @@ namespace EasyStateful.Runtime {
             // Create grouped tweens
             foreach (var kvp in propertiesToTweenGrouped)
             {
-                var groupKey = kvp.Key; // (duration, ease)
-                var propsInGroup = kvp.Value; // List of (Property, PropertyBinding, initialValue)
+                var groupEase = kvp.Key;
+                var propsInGroup = kvp.Value;
 
                 if (propsInGroup.Count == 0) continue;
 
-                // This DOVirtual.Float tweens a dummy value from 0 to 1,
-                // representing the normalized progress of this group's animation.
-                DOVirtual.Float(0f, 1f, groupKey.duration, progress =>
+                // Use the same duration for all groups (from root/group/global)
+                DOVirtual.Float(0f, 1f, overallDuration, progress =>
                 {
                     foreach (var item in propsInGroup)
                     {
-                        // item is (Property prop, PropertyBinding binding, float initialValue)
-                        // LerpUnclamped is used because the ease is applied to the 'progress' value itself.
                         float interpolatedValue = Mathf.LerpUnclamped(item.initialValue, item.prop.value, progress);
-                        
-                        if (item.binding.component != null) // Ensure component is not null
+                        if (item.binding.component != null)
                         {
                             item.binding.setter(item.binding.component, interpolatedValue);
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
                             if (!Application.isPlaying && GUI.changed) // Only in Editor and not Play Mode
                             {
                                 // Mark the specific component whose property was changed as dirty.
                                 // This encourages the editor to repaint views that display this component's state.
                                 EditorUtility.SetDirty(item.binding.component);
                             }
-    #endif
+#endif
                         }
                     }
                 })
-                .SetEase(groupKey.ease)
+                .SetEase(groupEase)
                 .SetTarget(this)
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
                 .SetUpdate(Application.isPlaying ? UpdateType.Normal : UpdateType.Manual)
-    #endif
+#endif
                 ;
             }
         }
@@ -444,9 +448,9 @@ namespace EasyStateful.Runtime {
             if (prop.propertyName == "m_IsActive" && binding.targetGameObject != null)
             {
                 binding.targetGameObject.SetActive(prop.value > 0.5f); // Assuming 1 for true, 0 for false
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
                 if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.targetGameObject);
-    #endif
+#endif
             }
             else if (!string.IsNullOrEmpty(prop.objectReference) && binding.setterObj != null && binding.component != null)
             {
@@ -459,9 +463,9 @@ namespace EasyStateful.Runtime {
                 {
                     Debug.LogError($"Error executing compiled object setter for {prop.propertyName} on {binding.component.GetType().Name} with object {obj?.name} (Path: {prop.objectReference}): {ex.Message}", this);
                 }
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
                 if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.component);
-    #endif
+#endif
             }
             else if (binding.setter != null && binding.component != null)
             {
@@ -473,9 +477,9 @@ namespace EasyStateful.Runtime {
                 {
                      Debug.LogError($"Error executing compiled numeric setter for {prop.propertyName} on {binding.component.GetType().Name}: {ex.Message}", this);
                 }
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
                 if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.component);
-    #endif
+#endif
             }
         }
 
@@ -951,7 +955,6 @@ namespace EasyStateful.Runtime {
                     var rule = GetPropertyOverrideRule(prop.propertyName, prop.componentType);
                     if (rule != null)
                     {
-                        if (rule.overrideDuration) duration = rule.duration;
                         if (rule.overrideEase) ease = rule.ease;
                         instantEnableDelayedDisable = rule.instantEnableDelayedDisable;
                     }
