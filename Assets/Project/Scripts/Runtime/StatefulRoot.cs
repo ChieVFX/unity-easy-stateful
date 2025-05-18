@@ -247,35 +247,80 @@ namespace EasyStateful.Runtime {
             float overallDuration = duration ?? GetEffectiveTransitionTime();
             Ease overallEase = ease ?? GetEffectiveEase();
 
-            // Use pooled collections
-            _pooledPropertiesToSnap.Clear();
-            List<Property> propertiesToSnap = _pooledPropertiesToSnap;
+            #if UNITY_EDITOR
+            bool usePooling = Application.isPlaying;
+            #else
+            const bool usePooling = true;
+            #endif
 
-            // Clear dictionary and its lists' contents
-            foreach(var list in _pooledPropertiesToTweenGrouped.Values)
+            List<Property> propertiesToSnap;
+            Dictionary<(float duration, Ease ease), List<(Property prop, PropertyBinding binding, float initialValue)>> propertiesToTweenGrouped;
+
+            if (usePooling)
             {
-                list.Clear(); 
+                _pooledPropertiesToSnap.Clear();
+                propertiesToSnap = _pooledPropertiesToSnap;
+
+                foreach (var list in _pooledPropertiesToTweenGrouped.Values)
+                    list.Clear();
+                _pooledPropertiesToTweenGrouped.Clear();
+                propertiesToTweenGrouped = _pooledPropertiesToTweenGrouped;
             }
-            _pooledPropertiesToTweenGrouped.Clear();
-            Dictionary<(float duration, Ease ease), List<(Property prop, PropertyBinding binding, float initialValue)>> propertiesToTweenGrouped =
-                _pooledPropertiesToTweenGrouped;
+            else
+            {
+                propertiesToSnap = new List<Property>();
+                propertiesToTweenGrouped = new Dictionary<(float, Ease), List<(Property, PropertyBinding, float)>>();
+            }
 
             foreach (var prop in state.properties)
             {
-                PropertyTransitionInfo info;
-                if (!_propertyTransitionCache.TryGetValue(prop, out info))
+#if UNITY_EDITOR
+                bool inEditor = !Application.isPlaying;
+#else
+                const bool inEditor = false;
+#endif
+
+                float finalPropDuration;
+                Ease finalPropEase;
+                bool handledBySpecialRule = false;
+                bool instantEnableDelayedDisable = false;
+
+                if (inEditor)
                 {
-                    // fallback if not found (shouldn't happen)
-                    info.duration = overallDuration;
-                    info.ease = overallEase;
-                    info.instantEnableDelayedDisable = false;
+                    // Always resolve transition info live in editor
+                    finalPropDuration = duration ?? GetEffectiveTransitionTime();
+                    finalPropEase = ease ?? GetEffectiveEase();
+                    var rule = GetPropertyOverrideRule(prop.propertyName, prop.componentType);
+                    if (rule != null)
+                    {
+                        if (rule.instantEnableDelayedDisable && prop.propertyName == "m_IsActive")
+                        {
+                            instantEnableDelayedDisable = true;
+                        }
+                        else if (rule.instantEnableDelayedDisable)
+                        {
+                            finalPropDuration = 0f;
+                        }
+                        if (rule.overrideDuration) finalPropDuration = rule.duration;
+                        if (rule.overrideEase) finalPropEase = rule.ease;
+                    }
+                }
+                else
+                {
+                    // Use cached info in play mode
+                    PropertyTransitionInfo info;
+                    if (!_propertyTransitionCache.TryGetValue(prop, out info))
+                    {
+                        info.duration = duration ?? GetEffectiveTransitionTime();
+                        info.ease = ease ?? GetEffectiveEase();
+                        info.instantEnableDelayedDisable = false;
+                    }
+                    finalPropDuration = duration ?? info.duration;
+                    finalPropEase = ease ?? info.ease;
+                    instantEnableDelayedDisable = info.instantEnableDelayedDisable;
                 }
 
-                float finalPropDuration = duration ?? info.duration;
-                Ease finalPropEase = ease ?? info.ease;
-                bool handledBySpecialRule = false;
-
-                if (info.instantEnableDelayedDisable && prop.propertyName == "m_IsActive")
+                if (instantEnableDelayedDisable && prop.propertyName == "m_IsActive")
                 {
                     if (prop.value > 0.5f)
                     {
@@ -303,7 +348,7 @@ namespace EasyStateful.Runtime {
                     }
                     handledBySpecialRule = true;
                 }
-                else if (info.instantEnableDelayedDisable) // For non-m_IsActive properties that should be instant
+                else if (instantEnableDelayedDisable) // For non-m_IsActive properties that should be instant
                 {
                     finalPropDuration = 0f;
                 }
