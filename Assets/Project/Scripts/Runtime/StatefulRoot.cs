@@ -65,6 +65,8 @@ namespace EasyStateful.Runtime {
 
         private Dictionary<Property, PropertyTransitionInfo> _propertyTransitionCache = new();
 
+        private static Dictionary<(Type, string), MemberInfo> _memberInfoCache = new();
+
         [Serializable]
         private class PropertyBinding
         {
@@ -490,6 +492,10 @@ namespace EasyStateful.Runtime {
         /// </summary>
         private PropertyBinding GetOrCreateBinding(Property prop, out Transform target)
         {
+            // Intern strings for cache keys
+            var componentTypeKey = string.Intern(prop.componentType);
+            var propertyNameKey = string.Intern(prop.propertyName);
+
             target = transform.Find(prop.path);
             if (target == null)
             {
@@ -503,49 +509,56 @@ namespace EasyStateful.Runtime {
                 bindingCache[prop.path] = compMap;
             }
 
-            var cacheKey = (prop.componentType, prop.propertyName);
+            var cacheKey = (componentTypeKey, propertyNameKey);
             if (compMap.TryGetValue(cacheKey, out var binding))
             {
                 return binding;
             }
-            
-            // Special handling for GameObject.m_IsActive (already optimized)
-            if (prop.propertyName == "m_IsActive" && 
-                (string.IsNullOrEmpty(prop.componentType) || prop.componentType == typeof(GameObject).FullName || prop.componentType == typeof(GameObject).AssemblyQualifiedName))
+
+            // Special handling for GameObject.m_IsActive
+            if (propertyNameKey == "m_IsActive" && 
+                (string.IsNullOrEmpty(componentTypeKey) || componentTypeKey == typeof(GameObject).FullName || componentTypeKey == typeof(GameObject).AssemblyQualifiedName))
             {
                 binding = new PropertyBinding { 
                     targetGameObject = target.gameObject, 
-                    propertyName = prop.propertyName, 
+                    propertyName = propertyNameKey, 
                     isGameObjectActiveProperty = true 
                 };
-                // Getter for m_IsActive (simple, no component cast needed in lambda)
                 binding.getter = (_) => binding.targetGameObject.activeSelf ? 1f : 0f;
-                // Setter for m_IsActive is handled by ApplyProperty for snapping, not numeric tweening.
                 compMap[cacheKey] = binding;
                 return binding;
             }
 
             // Type caching
-            if (!_typeCache.TryGetValue(prop.componentType, out var compType))
+            if (!_typeCache.TryGetValue(componentTypeKey, out var compType))
             {
-                compType = Type.GetType(prop.componentType);
+                compType = Type.GetType(componentTypeKey);
                 if (compType != null)
-                    _typeCache[prop.componentType] = compType;
+                    _typeCache[componentTypeKey] = compType;
             }
             if (compType == null)
             {
-                Debug.LogWarning($"Component type not found: {prop.componentType} for path {prop.path}, property {prop.propertyName}", this);
+                Debug.LogWarning($"Component type not found: {componentTypeKey} for path {prop.path}, property {propertyNameKey}", this);
                 return null;
             }
 
             var comp = target.GetComponent(compType);
             if (comp == null)
             {
-                Debug.LogWarning($"Component {compType.Name} not found on {prop.path} for property {prop.propertyName}", this);
+                Debug.LogWarning($"Component {compType.Name} not found on {prop.path} for property {propertyNameKey}", this);
                 return null;
             }
 
-            binding = new PropertyBinding { component = comp, targetGameObject = target.gameObject, propertyName = prop.propertyName };
+            binding = new PropertyBinding { component = comp, targetGameObject = target.gameObject, propertyName = propertyNameKey };
+
+            // MemberInfo caching
+            var memberKey = (compType, propertyNameKey);
+            if (!_memberInfoCache.TryGetValue(memberKey, out var memberInfo))
+            {
+                memberInfo = compType.GetProperty(propertyNameKey, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo
+                          ?? compType.GetField(propertyNameKey, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo;
+                _memberInfoCache[memberKey] = memberInfo;
+            }
 
             bool isObjectRef = !string.IsNullOrEmpty(prop.objectReference);
 
