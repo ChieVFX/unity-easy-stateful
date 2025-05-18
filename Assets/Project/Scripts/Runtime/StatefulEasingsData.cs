@@ -6,6 +6,13 @@ namespace EasyStateful.Runtime {
     {
         public AnimationCurve[] curves = new AnimationCurve[System.Enum.GetValues(typeof(Stateful.Runtime.Ease)).Length];
 
+        private const float PI = Mathf.PI;
+        private const float BIG_TANGENT = 100f; // Used for "infinite" or very large derivatives
+
+        // Constants for Elastic Easing
+        private const float ELASTIC_C4 = (2f * Mathf.PI) / 3f;
+        private const float ELASTIC_C5 = (2f * Mathf.PI) / 4.5f;
+
         private void OnValidate()
         {
             if (curves == null || curves.Length != System.Enum.GetValues(typeof(Stateful.Runtime.Ease)).Length)
@@ -28,11 +35,125 @@ namespace EasyStateful.Runtime {
             }
         }
 
+        // Helper for creating elastic keyframes
+        private static Keyframe[] CreateElasticKeyframes(System.Func<float, float> valFunc, System.Func<float, float> derivFunc, float[] times, bool flatStartTangent = false, bool flatEndTangent = false)
+        {
+            Keyframe[] keys = new Keyframe[times.Length];
+            for (int i = 0; i < times.Length; ++i)
+            {
+                float t = times[i];
+                float val = valFunc(t);
+                float deriv = derivFunc(t); 
+                
+                float inT = deriv, outT = deriv;
+                float inW = 1/3f, outW = 1/3f; 
+
+                if (Mathf.Approximately(inT, 0f)) inW = 0f;
+                if (Mathf.Approximately(outT, 0f)) outW = 0f;
+                
+                keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
+                keys[i].weightedMode = WeightedMode.Both;
+            }
+
+            if (keys.Length > 0) {
+                if (flatStartTangent) {
+                    keys[0].inTangent = 0f; keys[0].outTangent = 0f;
+                    keys[0].inWeight = 0f; keys[0].outWeight = 0f;
+                }
+                if (flatEndTangent && keys.Length > 1) {
+                    keys[keys.Length-1].inTangent = 0f; keys[keys.Length-1].outTangent = 0f;
+                    keys[keys.Length-1].inWeight = 0f; keys[keys.Length-1].outWeight = 0f;
+                }
+            }
+            return keys;
+        }
+
+        // InElastic easing functions
+        private static float CalculateInElastic_Val(float x) {
+            if (x == 0f) return 0f;
+            if (x == 1f) return 1f;
+            return -Mathf.Pow(2f, 10f * x - 10f) * Mathf.Sin((x * 10f - 10.75f) * ELASTIC_C4);
+        }
+
+        private static float CalculateInElastic_Deriv(float x) {
+            if (x == 0f) return 0f; 
+            
+            float exp_val = Mathf.Pow(2f, 10f * x - 10f);
+            float sin_arg = (x * 10f - 10.75f) * ELASTIC_C4;
+            float sin_component = Mathf.Sin(sin_arg);
+            float cos_component = Mathf.Cos(sin_arg);
+
+            float deriv_val = -exp_val * (10f * Mathf.Log(2f) * sin_component + 10f * ELASTIC_C4 * cos_component);
+            return Mathf.Clamp(deriv_val, -BIG_TANGENT, BIG_TANGENT);
+        }
+
+        // OutElastic easing functions
+        private static float CalculateOutElastic_Val(float x) {
+            if (x == 0f) return 0f;
+            if (x == 1f) return 1f;
+            return Mathf.Pow(2f, -10f * x) * Mathf.Sin((x * 10f - 0.75f) * ELASTIC_C4) + 1f;
+        }
+
+        private static float CalculateOutElastic_Deriv(float x) {
+            if (x == 1f) return 0f; 
+
+            float exp_val = Mathf.Pow(2f, -10f * x);
+            float sin_arg = (x * 10f - 0.75f) * ELASTIC_C4;
+            float sin_component = Mathf.Sin(sin_arg);
+            float cos_component = Mathf.Cos(sin_arg);
+
+            float deriv_A = -10f * Mathf.Log(2f) * exp_val;
+            float deriv_B = 10f * ELASTIC_C4 * cos_component;
+            
+            float deriv_val = deriv_A * sin_component + exp_val * deriv_B;
+            return Mathf.Clamp(deriv_val, -BIG_TANGENT, BIG_TANGENT);
+        }
+        
+        // InOutElastic easing functions
+        private static float CalculateInOutElastic_Val_Internal(float x) {
+            float sin_arg_val = (20f * x - 11.125f) * ELASTIC_C5;
+            float sin_component = Mathf.Sin(sin_arg_val);
+
+            if (x < 0.5f) {
+                return -0.5f * Mathf.Pow(2f, 20f * x - 10f) * sin_component;
+            } else { 
+                return 0.5f * Mathf.Pow(2f, -20f * x + 10f) * sin_component + 1f;
+            }
+        }
+        private static float CalculateInOutElastic_Val(float x) {
+            if (x == 0f) return 0f;
+            if (x == 1f) return 1f;
+            return CalculateInOutElastic_Val_Internal(x);
+        }
+
+        private static float CalculateInOutElastic_Deriv_Internal(float x) {
+            float sin_arg_val = (20f * x - 11.125f) * ELASTIC_C5;
+            float sin_component = Mathf.Sin(sin_arg_val);
+            float cos_component = Mathf.Cos(sin_arg_val);
+            float deriv_val;
+
+            if (Mathf.Approximately(x, 0.5f)) {
+                return 10f * Mathf.Log(2f); // Approx 6.93
+            } else if (x < 0.5f) {
+                float exp_val = Mathf.Pow(2f, 20f * x - 10f);
+                float deriv_A_factor = -10f * Mathf.Log(2f) * exp_val;
+                float deriv_B_term = 20f * ELASTIC_C5 * cos_component;
+                deriv_val = deriv_A_factor * sin_component + (-0.5f * exp_val) * deriv_B_term;
+            } else { // x > 0.5f
+                float exp_val = Mathf.Pow(2f, -20f * x + 10f);
+                float deriv_A_factor = -10f * Mathf.Log(2f) * exp_val;
+                float deriv_B_term = 20f * ELASTIC_C5 * cos_component;
+                deriv_val = deriv_A_factor * sin_component + (0.5f * exp_val) * deriv_B_term;
+            }
+            return Mathf.Clamp(deriv_val, -BIG_TANGENT, BIG_TANGENT);
+        }
+        private static float CalculateInOutElastic_Deriv(float x) {
+            if (x == 0f || x == 1f) return 0f;
+            return CalculateInOutElastic_Deriv_Internal(x);
+        }
+
         public static AnimationCurve GetDefaultCurve(Stateful.Runtime.Ease ease)
         {
-            const float PI = Mathf.PI;
-            const float BIG_TANGENT = 100f; // Used for "infinite" or very large derivatives
-
             // Local static functions for derivative calculations
             static float CalculateInCirc_Val(float x) {
                 return 1f - Mathf.Sqrt(Mathf.Max(0f, 1f - x * x));
@@ -359,6 +480,24 @@ namespace EasyStateful.Runtime {
                             keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
                             keys[i].weightedMode = WeightedMode.Both;
                         }
+                        return new AnimationCurve(keys);
+                    }
+                case Stateful.Runtime.Ease.InElastic:
+                    {
+                        float[] times = {0f, 0.6f, 0.7f, 0.775f, 0.85f, 0.925f, 0.97f, 1f};
+                        Keyframe[] keys = CreateElasticKeyframes(CalculateInElastic_Val, CalculateInElastic_Deriv, times, flatStartTangent: true);
+                        return new AnimationCurve(keys);
+                    }
+                case Stateful.Runtime.Ease.OutElastic:
+                    {
+                        float[] times = {0f, 0.03f, 0.075f, 0.15f, 0.225f, 0.3f, 0.4f, 1f};
+                        Keyframe[] keys = CreateElasticKeyframes(CalculateOutElastic_Val, CalculateOutElastic_Deriv, times, flatEndTangent: true);
+                        return new AnimationCurve(keys);
+                    }
+                case Stateful.Runtime.Ease.InOutElastic:
+                    {
+                        float[] times = {0f, 0.05f, 0.15f, 0.25f, 0.35f, 0.44375f, 0.5f, 0.55625f, 0.65f, 0.75f, 0.85f, 0.95f, 1f};
+                        Keyframe[] keys = CreateElasticKeyframes(CalculateInOutElastic_Val, CalculateInOutElastic_Deriv, times, flatStartTangent: true, flatEndTangent: true);
                         return new AnimationCurve(keys);
                     }
                 // For Elastic, Back, Bounce, Flash, etc., you may want to use custom or hand-tuned curves or leave as linear for now.
