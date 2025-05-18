@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using DG.Tweening;
 using System.Linq;
+using System.Linq.Expressions;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -46,9 +47,30 @@ namespace EasyStateful.Runtime {
         {
             public Component component;
             public GameObject targetGameObject;
-            public string propertyName;
+            public string propertyName; // Full property name, e.g., "m_Color.r" or "m_IsEnabled"
+
+            // For numeric properties (float, int, bool interpreted as 0/1)
             public Action<Component, float> setter;
+            public Func<Component, float> getter;
+
+            // For object reference properties
             public Action<Component, UnityEngine.Object> setterObj;
+
+            // Cached reflection info - used by GetOrCreateBinding to compile expressions
+            internal PropertyInfo propInfo;
+            internal FieldInfo fieldInfo;
+            internal Type valueType; // The actual type of the property/field (e.g., float, Color, Vector3)
+
+            internal PropertyInfo mainPropInfo;
+            internal FieldInfo mainFieldInfo;
+            internal Type mainValueType; // Type of the container (e.g., Vector3, Color)
+
+            internal PropertyInfo subPropInfo;
+            internal FieldInfo subFieldInfo;
+            internal Type subValueType; // Type of the sub-member (e.g., float)
+            
+            internal bool isSubProperty = false; 
+            internal bool isGameObjectActiveProperty = false;
         }
 
         // Track inspector-driven changes at runtime
@@ -101,19 +123,33 @@ namespace EasyStateful.Runtime {
             // Tier 1: Group Settings Property Override
             if (groupSettings != null && groupSettings.propertyOverrides != null)
             {
-                var groupSpecificRule = groupSettings.propertyOverrides.FirstOrDefault(r =>
-                    r.propertyName == propertyName &&
-                    !string.IsNullOrEmpty(r.componentType) &&
-                    r.componentType == componentTypeFullName);
-                if (groupSpecificRule != null) return groupSpecificRule;
-
-                var groupGeneralRule = groupSettings.propertyOverrides.FirstOrDefault(r =>
-                    r.propertyName == propertyName &&
-                    string.IsNullOrEmpty(r.componentType));
-                if (groupGeneralRule != null) return groupGeneralRule;
+                // Check for specific rule (component type match)
+                for (int i = 0; i < groupSettings.propertyOverrides.Count; i++)
+                {
+                    var r = groupSettings.propertyOverrides[i];
+                    if (r.propertyName == propertyName &&
+                        !string.IsNullOrEmpty(r.componentType) &&
+                        r.componentType == componentTypeFullName)
+                    {
+                        return r;
+                    }
+                }
+                // Check for general rule (no component type specified, matches any)
+                for (int i = 0; i < groupSettings.propertyOverrides.Count; i++)
+                {
+                    var r = groupSettings.propertyOverrides[i];
+                    if (r.propertyName == propertyName &&
+                        string.IsNullOrEmpty(r.componentType))
+                    {
+                        return r;
+                    }
+                }
             }
 
             // Tier 2: Global Settings Property Override
+            // (Assuming StatefulGlobalSettings.GetGlobalPropertyOverrideRule is already efficient or its list is small)
+            // If StatefulGlobalSettings also uses a List and FirstOrDefault, it should be refactored similarly.
+            // For now, only changing the local part.
             return StatefulGlobalSettings.GetGlobalPropertyOverrideRule(propertyName, componentTypeFullName);
         }
 
@@ -377,7 +413,7 @@ namespace EasyStateful.Runtime {
             target = transform.Find(prop.path);
             if (target == null)
             {
-                Debug.LogWarning($"Path not found: {prop.path}");
+                Debug.LogWarning($"Path not found: {prop.path} for property {prop.propertyName} on component type {prop.componentType}", this);
                 return null;
             }
 
@@ -387,33 +423,39 @@ namespace EasyStateful.Runtime {
                 bindingCache[prop.path] = compMap;
             }
 
-            string cacheKey = $"{prop.componentType}_{prop.propertyName}"; // Ensure unique key if componentType can vary for same prop name
+            string cacheKey = $"{prop.componentType}_{prop.propertyName}";
             if (compMap.TryGetValue(cacheKey, out var binding))
             {
                 return binding;
             }
             
-            // Special handling for GameObject.m_IsActive
+            // Special handling for GameObject.m_IsActive (already optimized)
             if (prop.propertyName == "m_IsActive" && 
                 (string.IsNullOrEmpty(prop.componentType) || prop.componentType == typeof(GameObject).FullName || prop.componentType == typeof(GameObject).AssemblyQualifiedName))
             {
-                binding = new PropertyBinding { targetGameObject = target.gameObject, propertyName = prop.propertyName };
+                binding = new PropertyBinding { 
+                    targetGameObject = target.gameObject, 
+                    propertyName = prop.propertyName, 
+                    isGameObjectActiveProperty = true 
+                };
+                // Getter for m_IsActive (simple, no component cast needed in lambda)
+                binding.getter = (_) => binding.targetGameObject.activeSelf ? 1f : 0f;
+                // Setter for m_IsActive is handled by ApplyProperty for snapping, not numeric tweening.
                 compMap[cacheKey] = binding;
                 return binding;
             }
 
-            // Create new binding for regular components
             var compType = Type.GetType(prop.componentType);
             if (compType == null)
             {
-                Debug.LogWarning($"Component type not found: {prop.componentType}");
+                Debug.LogWarning($"Component type not found: {prop.componentType} for path {prop.path}, property {prop.propertyName}", this);
                 return null;
             }
 
             var comp = target.GetComponent(compType);
             if (comp == null)
             {
-                Debug.LogWarning($"Component {compType} not found on {prop.path}");
+                Debug.LogWarning($"Component {compType.Name} not found on {prop.path} for property {prop.propertyName}", this);
                 return null;
             }
 
@@ -423,85 +465,229 @@ namespace EasyStateful.Runtime {
 
             if (isObjectRef)
             {
-                // Setup setterObj for object references
                 var pi = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 var fi = compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                
+                if (pi != null) binding.propInfo = pi;
+                else if (fi != null) binding.fieldInfo = fi;
+                else {
+                    Debug.LogWarning($"Object reference Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}.", this);
+                    compMap[cacheKey] = binding; // Cache binding even if incomplete to prevent re-processing
+                    return binding; // Return the binding, setterObj will be null
+                }
+
                 if (pi != null && pi.CanWrite)
                 {
-                    var setter = pi.GetSetMethod(true);
-                    binding.setterObj = (c, o) => setter.Invoke(c, new object[] { o });
+                    var setterMethod = pi.GetSetMethod(true);
+                    if (setterMethod != null)
+                    {
+                        binding.setterObj = (c, o) => setterMethod.Invoke(c, new object[] { o });
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"Object reference Property '{prop.propertyName}' on type '{compType.Name}' for path {prop.path} has no writable setter.", this);
+                        // binding.setterObj remains null
+                    }
                 }
-                else if (fi != null)
+                else if (fi != null && !fi.IsLiteral && !fi.IsInitOnly)
                 {
                     binding.setterObj = (c, o) => fi.SetValue(c, o);
                 }
+                else if (fi != null && (fi.IsLiteral || fi.IsInitOnly))
+                {
+                     Debug.LogWarning($"Object reference Field '{prop.propertyName}' on type '{compType.Name}' for path {prop.path} is read-only.", this);
+                }
             }
-            else
+            else // Numeric property, use Expression Trees for getter/setter
             {
-                // Setup numeric setter (handles struct fields like m_Color.r or m_AnchoredPosition.x)
+                // Parameter expressions for the delegates
+                var componentParam = Expression.Parameter(typeof(Component), "c");
+                var valueParam = Expression.Parameter(typeof(float), "val"); // For setter
+
+                Expression castComponent = Expression.Convert(componentParam, compType);
+                Expression finalPropertyAccess = null; 
+                Type targetPropertyType = null; 
+
                 if (prop.propertyName.Contains("."))
                 {
+                    binding.isSubProperty = true;
                     var parts = prop.propertyName.Split('.');
                     var mainName = parts[0];
                     var subName = parts[1];
-                    // Try the internal member name
-                    var pi = compType.GetProperty(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    var fi = compType.GetField(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    // Fallback to public property if backing field not found
-                    if (pi == null && fi == null && mainName.StartsWith("m_"))
+
+                    binding.mainPropInfo = compType.GetProperty(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (binding.mainPropInfo == null) binding.mainFieldInfo = compType.GetField(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                    if (binding.mainPropInfo == null && binding.mainFieldInfo == null && mainName.StartsWith("m_"))
                     {
                         var fallbackName = char.ToLowerInvariant(mainName[2]) + mainName.Substring(3);
-                        pi = compType.GetProperty(fallbackName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        binding.mainPropInfo = compType.GetProperty(fallbackName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                     }
-                    if (pi != null && pi.CanRead && pi.CanWrite)
+                    
+                    Expression mainMemberAccess = null;
+                    Type mainMemberType = null;
+
+                    if (binding.mainPropInfo != null) { 
+                        mainMemberAccess = Expression.Property(castComponent, binding.mainPropInfo);
+                        mainMemberType = binding.mainPropInfo.PropertyType;
+                    } else if (binding.mainFieldInfo != null) {
+                        mainMemberAccess = Expression.Field(castComponent, binding.mainFieldInfo);
+                        mainMemberType = binding.mainFieldInfo.FieldType;
+                    } else {
+                        Debug.LogWarning($"Main member '{mainName}' not found for sub-property '{prop.propertyName}' on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
+                        compMap[cacheKey] = binding; return binding; // Cache incomplete binding
+                    }
+                    binding.mainValueType = mainMemberType;
+
+                    binding.subPropInfo = mainMemberType.GetProperty(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (binding.subPropInfo == null) binding.subFieldInfo = mainMemberType.GetField(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                    if (binding.subPropInfo != null) {
+                        finalPropertyAccess = Expression.Property(mainMemberAccess, binding.subPropInfo);
+                        targetPropertyType = binding.subPropInfo.PropertyType;
+                    } else if (binding.subFieldInfo != null) {
+                        finalPropertyAccess = Expression.Field(mainMemberAccess, binding.subFieldInfo);
+                        targetPropertyType = binding.subFieldInfo.FieldType;
+                    } else {
+                        Debug.LogWarning($"Sub member '{subName}' not found on main member '{mainName}' (type: {mainMemberType.Name}) for property '{prop.propertyName}' on path {prop.path}. Cannot create binding.", this);
+                        compMap[cacheKey] = binding; return binding; // Cache incomplete binding
+                    }
+                    binding.subValueType = targetPropertyType;
+                }
+                else 
+                {
+                    binding.propInfo = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (binding.propInfo == null) binding.fieldInfo = compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                    if (binding.propInfo != null) {
+                        finalPropertyAccess = Expression.Property(castComponent, binding.propInfo);
+                        targetPropertyType = binding.propInfo.PropertyType;
+                    } else if (binding.fieldInfo != null) {
+                        finalPropertyAccess = Expression.Field(castComponent, binding.fieldInfo);
+                        targetPropertyType = binding.fieldInfo.FieldType;
+                    } else {
+                        Debug.LogWarning($"Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
+                        compMap[cacheKey] = binding; return binding; // Cache incomplete binding
+                    }
+                    binding.valueType = targetPropertyType;
+                }
+
+                if (finalPropertyAccess == null || targetPropertyType == null)
+                {
+                    // Should have been caught above, but as a safeguard
+                    Debug.LogWarning($"Failed to establish property access for '{prop.propertyName}' on '{compType.Name}' (path {prop.path}). Binding will be incomplete.", this);
+                    compMap[cacheKey] = binding; return binding;
+                }
+
+                // Create Getter: Func<Component, float>
+                try
+                {
+                    Expression getterBody = finalPropertyAccess;
+                    if (targetPropertyType != typeof(float))
                     {
-                        binding.setter = (c, val) =>
+                        if (targetPropertyType == typeof(bool))
                         {
-                            var structVal = pi.GetValue(c, null);
-                            var stType = structVal.GetType();
-                            // Try property or field on the struct
-                            var subPi = stType.GetProperty(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                            var subFi = stType.GetField(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                            if (subPi != null && subPi.CanWrite)
-                                subPi.SetValue(structVal, Convert.ChangeType(val, subPi.PropertyType), null);
-                            else if (subFi != null)
-                                subFi.SetValue(structVal, Convert.ChangeType(val, subFi.FieldType));
-                            // Write back composite struct
-                            pi.SetValue(c, structVal, null);
-                        };
-                    }
-                    else if (fi != null)
-                    {
-                        binding.setter = (c, val) =>
+                            getterBody = Expression.Condition(Expression.IsTrue(getterBody), Expression.Constant(1f), Expression.Constant(0f));
+                        }
+                        else
                         {
-                            var structVal = fi.GetValue(c);
-                            var stType = structVal.GetType();
-                            var subPi = stType.GetProperty(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                            var subFi = stType.GetField(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                            if (subPi != null && subPi.CanWrite)
-                                subPi.SetValue(structVal, Convert.ChangeType(val, subPi.PropertyType), null);
-                            else if (subFi != null)
-                                subFi.SetValue(structVal, Convert.ChangeType(val, subFi.FieldType));
-                            fi.SetValue(c, structVal);
-                        };
+                            getterBody = Expression.Convert(getterBody, typeof(float));
+                        }
                     }
+                    var getterLambda = Expression.Lambda<Func<Component, float>>(getterBody, componentParam);
+                    binding.getter = getterLambda.Compile();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Failed to compile getter for {prop.propertyName} on {compType.Name} (path {prop.path}): {ex.Message}. This property may not be readable for tweening.", this);
+                    binding.getter = null; 
+                }
+                
+                // Determine if a setter can be attempted
+                bool canAttemptSetterCompilation = false;
+                if (binding.isSubProperty) {
+                    if (binding.mainValueType.IsValueType) { // Sub-property of a struct
+                        canAttemptSetterCompilation = (binding.subPropInfo != null || binding.subFieldInfo != null) && // Sub-member must exist
+                                                      (binding.mainPropInfo?.CanWrite == true || binding.mainFieldInfo?.IsInitOnly == false); // Main struct must be settable
+                    } else { // Sub-property of a class
+                        canAttemptSetterCompilation = (binding.subPropInfo?.CanWrite == true) || (binding.subFieldInfo != null && !binding.subFieldInfo.IsInitOnly && !binding.subFieldInfo.IsLiteral);
+                    }
+                } else { // Simple property
+                    canAttemptSetterCompilation = (binding.propInfo?.CanWrite == true) || (binding.fieldInfo != null && !binding.fieldInfo.IsInitOnly && !binding.fieldInfo.IsLiteral);
+                }
+
+                if (!canAttemptSetterCompilation)
+                {
+                    // Debug.LogWarning($"Property/Field '{prop.propertyName}' on type '{compType.Name}' (path {prop.path}) is not considered writable. It will not be numerically tweenable.", this);
+                    // binding.setter will remain null
                 }
                 else
                 {
-                    var pi = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    var fi = compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (pi != null && pi.CanWrite)
+                    try
                     {
-                        binding.setter = (c, val) => pi.SetValue(c, Convert.ChangeType(val, pi.PropertyType), null);
+                        Expression valueToSet = valueParam; 
+                        if (targetPropertyType != typeof(float))
+                        {
+                            if (targetPropertyType == typeof(bool))
+                            {
+                                valueToSet = Expression.GreaterThan(valueParam, Expression.Constant(0.5f));
+                            }
+                            else
+                            {
+                                valueToSet = Expression.Convert(valueParam, targetPropertyType);
+                            }
+                        }
+
+                        Expression assignExpression;
+                        if (binding.isSubProperty && binding.mainValueType.IsValueType && (binding.mainPropInfo != null || binding.mainFieldInfo != null))
+                        {
+                            Expression mainStructReadAccess = (binding.mainPropInfo != null)
+                                ? Expression.Property(castComponent, binding.mainPropInfo)
+                                : Expression.Field(castComponent, binding.mainFieldInfo);
+
+                            var structVar = Expression.Variable(binding.mainValueType, "tempStruct");
+                            var assignToStructVar = Expression.Assign(structVar, mainStructReadAccess);
+
+                            Expression subMemberAccessOnStructVar = (binding.subPropInfo != null)
+                                ? Expression.Property(structVar, binding.subPropInfo)
+                                : Expression.Field(structVar, binding.subFieldInfo);
+                            
+                            var assignToSubMember = Expression.Assign(subMemberAccessOnStructVar, valueToSet);
+                            
+                            Expression mainStructWriteAccess = (binding.mainPropInfo != null && binding.mainPropInfo.CanWrite)
+                                ? Expression.Property(castComponent, binding.mainPropInfo) 
+                                : (binding.mainFieldInfo != null && !binding.mainFieldInfo.IsInitOnly ? Expression.Field(castComponent, binding.mainFieldInfo) : null);
+
+                            if (mainStructWriteAccess == null) {
+                                throw new InvalidOperationException($"Main struct property/field '{binding.mainPropInfo?.Name ?? binding.mainFieldInfo?.Name}' is not writable.");
+                            }
+                            
+                            var assignStructVarBack = Expression.Assign(mainStructWriteAccess, structVar);
+
+                            assignExpression = Expression.Block(
+                                new[] { structVar }, 
+                                assignToStructVar,
+                                assignToSubMember,
+                                assignStructVarBack
+                            );
+                        }
+                        else 
+                        {
+                            assignExpression = Expression.Assign(finalPropertyAccess, valueToSet);
+                        }
+
+                        var setterLambda = Expression.Lambda<Action<Component, float>>(assignExpression, componentParam, valueParam);
+                        binding.setter = setterLambda.Compile();
                     }
-                    else if (fi != null)
+                    catch (Exception ex)
                     {
-                        binding.setter = (c, val) => fi.SetValue(c, Convert.ChangeType(val, fi.FieldType));
+                         Debug.LogError($"Failed to compile setter for {prop.propertyName} on {compType.Name} (path {prop.path}): {ex.Message}. This property will not be numerically tweenable.", this);
+                         binding.setter = null; 
                     }
                 }
             }
 
-            compMap[cacheKey] = binding;
+            compMap[cacheKey] = binding; // Cache the binding, complete or not
             return binding;
         }
 
@@ -510,53 +696,37 @@ namespace EasyStateful.Runtime {
         /// </summary>
         private float GetCurrentValue(PropertyBinding binding)
         {
-            if (binding.propertyName == "m_IsActive" && binding.targetGameObject != null)
+            if (binding.isGameObjectActiveProperty) // Uses its own specialized getter
             {
-                return binding.targetGameObject.activeSelf ? 1f : 0f;
-            }
-            if (binding.component == null)
-            {
-                Debug.LogWarning($"Cannot get current value for '{binding.propertyName}': Component is null in binding.");
-                return 0f;
+                 if (binding.targetGameObject == null) {
+                    Debug.LogWarning($"Cannot get current value for '{binding.propertyName}': targetGameObject is null in binding for an m_IsActive property.", this);
+                    return 0f;
+                 }
+                return binding.getter(null); // Component parameter is not used by this getter
             }
 
-            var compType = binding.component.GetType();
-            var name = binding.propertyName;
-            if (name.Contains("."))
+            if (binding.component == null)
             {
-                var parts = name.Split('.');
-                var mainName = parts[0];
-                var subName = parts[1];
-                // Try the internal member name
-                var pi = compType.GetProperty(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                var fi = compType.GetField(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                // Fallback to public property if backing field not found
-                if (pi == null && fi == null && mainName.StartsWith("m_"))
-                {
-                    var fallbackName = char.ToLowerInvariant(mainName[2]) + mainName.Substring(3);
-                    pi = compType.GetProperty(fallbackName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                }
-                object structVal = null;
-                if (pi != null) structVal = pi.GetValue(binding.component, null);
-                else if (fi != null) structVal = fi.GetValue(binding.component);
-                if (structVal == null) return 0f;
-                var stType = structVal.GetType();
-                // Get sub-member
-                var subPi = stType.GetProperty(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                var subFi = stType.GetField(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (subPi != null)
-                    return Convert.ToSingle(subPi.GetValue(structVal, null));
-                if (subFi != null)
-                    return Convert.ToSingle(subFi.GetValue(structVal));
-                Debug.LogWarning($"Sub-member not found: {subName} on {stType}");
+                // This path should ideally be caught by GetOrCreateBinding returning null if component is missing
+                Debug.LogWarning($"Cannot get current value for '{binding.propertyName}': Component is null in binding.", this);
                 return 0f;
             }
-            else
+            if (binding.getter == null)
             {
-                var pi = compType.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                var fi = compType.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                var val = pi != null ? pi.GetValue(binding.component, null) : fi.GetValue(binding.component);
-                return Convert.ToSingle(val);
+                // This implies GetOrCreateBinding failed to create a getter, or it's an object ref property without a numeric getter.
+                // For tweening, numeric properties must have a getter.
+                Debug.LogWarning($"Cannot get current value for '{binding.propertyName}' on component '{binding.component.GetType().Name}': Getter is null. Property may not be numeric/tweenable or binding setup failed.", this);
+                return 0f; 
+            }
+
+            try
+            {
+                return binding.getter(binding.component);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error executing compiled getter for {binding.propertyName} on {binding.component.GetType().Name}: {ex.Message}", this);
+                return 0f;
             }
         }
 

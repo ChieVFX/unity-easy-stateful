@@ -27,9 +27,11 @@ public class Test : MonoBehaviour
         {
             return;
         }
-;
+
         _time = 0;
         string[] stateNames = statefulRoot.stateNames;
+        if (stateNames == null || stateNames.Length == 0) return; // Guard against empty/null state names
+
         _currentState = (_currentState + 1) % stateNames.Length;
         statefulRoot.TweenToState(stateNames[_currentState]);
     }
