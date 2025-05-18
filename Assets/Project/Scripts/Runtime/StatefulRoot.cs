@@ -41,6 +41,13 @@ namespace EasyStateful.Runtime {
 
         // Cache per-path and per-property binding info for fast reflection
         private Dictionary<string, Dictionary<string, PropertyBinding>> bindingCache = new Dictionary<string, Dictionary<string, PropertyBinding>>();
+        
+        // Pooled collections for TweenToState to reduce GC
+        private List<Property> _pooledPropertiesToSnap = new List<Property>();
+        // For _pooledPropertiesToTweenGrouped, we'll start by clearing its internal lists if they exist,
+        // and the dictionary itself. Full pooling of inner lists is more complex and can be a later step if needed.
+        private Dictionary<(float duration, Ease ease), List<(Property prop, PropertyBinding binding, float initialValue)>> _pooledPropertiesToTweenGrouped =
+            new Dictionary<(float, Ease), List<(Property, PropertyBinding, float)>>();
 
         [Serializable]
         private class PropertyBinding
@@ -213,7 +220,7 @@ namespace EasyStateful.Runtime {
                 return;
             }
             
-            DOTween.Kill(this, true); // Kill existing tweens on this target
+            DOTween.Kill(this, true); 
             
             var state = stateMachine.states.Find(s => s.name == stateName);
             if (state == null)
@@ -225,9 +232,18 @@ namespace EasyStateful.Runtime {
             float overallDuration = duration ?? GetEffectiveTransitionTime();
             Ease overallEase = ease ?? GetEffectiveEase();
 
-            List<Property> propertiesToSnap = new List<Property>();
+            // Use pooled collections
+            _pooledPropertiesToSnap.Clear();
+            List<Property> propertiesToSnap = _pooledPropertiesToSnap;
+
+            // Clear dictionary and its lists' contents
+            foreach(var list in _pooledPropertiesToTweenGrouped.Values)
+            {
+                list.Clear(); 
+            }
+            _pooledPropertiesToTweenGrouped.Clear();
             Dictionary<(float duration, Ease ease), List<(Property prop, PropertyBinding binding, float initialValue)>> propertiesToTweenGrouped =
-                new Dictionary<(float, Ease), List<(Property, PropertyBinding, float)>>();
+                _pooledPropertiesToTweenGrouped;
 
             foreach (var prop in state.properties)
             {
@@ -301,12 +317,13 @@ namespace EasyStateful.Runtime {
                 {
                     propertiesToSnap.Add(prop);
                 }
-                else if (binding.setter != null && binding.component != null) // Numeric, tweenable property
+                else if (binding.setter != null && binding.component != null && binding.getter != null) // Numeric, tweenable property
                 {
                     float initialValue = GetCurrentValue(binding);
                     var key = (duration: finalPropDuration, ease: finalPropEase);
                     if (!propertiesToTweenGrouped.ContainsKey(key))
                     {
+                        // For now, still new-ing up inner lists. Pooling these is next if GC remains high from here.
                         propertiesToTweenGrouped[key] = new List<(Property prop, PropertyBinding binding, float initialValue)>();
                     }
                     propertiesToTweenGrouped[key].Add((prop, binding, initialValue));
@@ -381,16 +398,29 @@ namespace EasyStateful.Runtime {
             }
             else if (!string.IsNullOrEmpty(prop.objectReference) && binding.setterObj != null && binding.component != null)
             {
-                // Load object from Resources (path without extension)
                 var obj = Resources.Load(prop.objectReference);
-                binding.setterObj(binding.component, obj);
+                try
+                {
+                    binding.setterObj(binding.component, obj);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Error executing compiled object setter for {prop.propertyName} on {binding.component.GetType().Name} with object {obj?.name} (Path: {prop.objectReference}): {ex.Message}", this);
+                }
     #if UNITY_EDITOR
                 if (!Application.isPlaying) EditorUtility.SetDirty(binding.component);
     #endif
             }
             else if (binding.setter != null && binding.component != null)
             {
-                binding.setter(binding.component, prop.value);
+                try
+                {
+                    binding.setter(binding.component, prop.value);
+                }
+                catch (Exception ex)
+                {
+                     Debug.LogError($"Error executing compiled numeric setter for {prop.propertyName} on {binding.component.GetType().Name}: {ex.Message}", this);
+                }
     #if UNITY_EDITOR
                 if (!Application.isPlaying) EditorUtility.SetDirty(binding.component);
     #endif
@@ -472,26 +502,55 @@ namespace EasyStateful.Runtime {
                 else if (fi != null) binding.fieldInfo = fi;
                 else {
                     Debug.LogWarning($"Object reference Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}.", this);
-                    compMap[cacheKey] = binding; // Cache binding even if incomplete to prevent re-processing
-                    return binding; // Return the binding, setterObj will be null
+                    compMap[cacheKey] = binding; 
+                    return binding; 
                 }
+
+                Type memberType = pi?.PropertyType ?? fi?.FieldType;
 
                 if (pi != null && pi.CanWrite)
                 {
                     var setterMethod = pi.GetSetMethod(true);
                     if (setterMethod != null)
                     {
-                        binding.setterObj = (c, o) => setterMethod.Invoke(c, new object[] { o });
+                        try
+                        {
+                            var componentParamExpr = Expression.Parameter(typeof(Component), "c_");
+                            var objectParamExpr = Expression.Parameter(typeof(UnityEngine.Object), "o_");
+                            var castCompExpr = Expression.Convert(componentParamExpr, compType);
+                            // It's crucial to cast the incoming UnityEngine.Object to the specific type the property expects.
+                            var castObjExpr = Expression.Convert(objectParamExpr, memberType);
+                            var callSetterExpr = Expression.Call(castCompExpr, setterMethod, castObjExpr);
+                            binding.setterObj = Expression.Lambda<Action<Component, UnityEngine.Object>>(callSetterExpr, componentParamExpr, objectParamExpr).Compile();
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogError($"Failed to compile object setter for Property '{prop.propertyName}' on type '{compType.Name}' (path {prop.path}): {ex.Message}. Will fallback to reflection invoke.", this);
+                            binding.setterObj = (c, o) => setterMethod.Invoke(c, new object[] { o }); // Fallback
+                        }
                     }
                     else
                     {
                         Debug.LogWarning($"Object reference Property '{prop.propertyName}' on type '{compType.Name}' for path {prop.path} has no writable setter.", this);
-                        // binding.setterObj remains null
                     }
                 }
                 else if (fi != null && !fi.IsLiteral && !fi.IsInitOnly)
                 {
-                    binding.setterObj = (c, o) => fi.SetValue(c, o);
+                    try
+                    {
+                        var componentParamExpr = Expression.Parameter(typeof(Component), "c_");
+                        var objectParamExpr = Expression.Parameter(typeof(UnityEngine.Object), "o_");
+                        var castCompExpr = Expression.Convert(componentParamExpr, compType);
+                        var castObjExpr = Expression.Convert(objectParamExpr, memberType);
+                        var fieldAccessExpr = Expression.Field(castCompExpr, fi);
+                        var assignExpr = Expression.Assign(fieldAccessExpr, castObjExpr);
+                        binding.setterObj = Expression.Lambda<Action<Component, UnityEngine.Object>>(assignExpr, componentParamExpr, objectParamExpr).Compile();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"Failed to compile object setter for Field '{prop.propertyName}' on type '{compType.Name}' (path {prop.path}): {ex.Message}. Will fallback to reflection invoke.", this);
+                        binding.setterObj = (c, o) => fi.SetValue(c, o); // Fallback
+                    }
                 }
                 else if (fi != null && (fi.IsLiteral || fi.IsInitOnly))
                 {
