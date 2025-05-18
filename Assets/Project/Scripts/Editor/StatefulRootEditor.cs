@@ -7,7 +7,6 @@ using System.IO;
 using DG.Tweening;
 using UnityEditorInternal;
 using EasyStateful.Runtime;
-using System.Reflection;
 
 namespace EasyStateful.Editor {
     [CustomEditor(typeof(StatefulRoot))]
@@ -208,8 +207,48 @@ namespace EasyStateful.Editor {
             {
                 EditorGUILayout.LabelField("States");
                 foreach (var stateName in displayStateNames)
+                {
                     if (GUILayout.Button(stateName))
-                        TriggerState(stateName);
+                    {
+                        // If in work mode (Animation component present), set AnimationWindow time to event time
+                        if (hasAnim)
+                        {
+                            AnimationClip currentClip = editorClipProp.objectReferenceValue as AnimationClip;
+                            if (currentClip != null)
+                            {
+                                var events = AnimationUtility.GetAnimationEvents(currentClip);
+                                var ev = events.FirstOrDefault(e => (e.functionName == stateName) || (e.stringParameter == stateName));
+                                if (ev != null)
+                                {
+                                    var animWindow = Resources.FindObjectsOfTypeAll<AnimationWindow>().FirstOrDefault();
+                                    if (animWindow != null)
+                                    {
+                                        animWindow.Focus();
+                                        animWindow.animationClip = currentClip;
+                                        animWindow.previewing = true;
+                                        animWindow.time = ev.time;
+                                        int frame = Mathf.RoundToInt(ev.time * currentClip.frameRate);
+                                        animWindow.frame = frame;
+                                        animWindow.Repaint();
+                                        Debug.Log($"[StatefulRootEditor] Set AnimationWindow to state '{stateName}' at time {ev.time} (frame {frame})");
+                                    }
+                                    else
+                                    {
+                                        Debug.LogWarning("[StatefulRootEditor] AnimationWindow not found.");
+                                    }
+                                }
+                                else
+                                {
+                                    Debug.LogWarning($"[StatefulRootEditor] No animation event found for state '{stateName}'.");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            TriggerState(stateName);
+                        }
+                    }
+                }
             }
 
             // Just in case foldout
