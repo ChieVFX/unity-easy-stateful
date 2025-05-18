@@ -382,7 +382,7 @@ namespace EasyStateful.Runtime {
             }
             static float CalculateInOutCirc_Deriv(float x) {
                 if (x == 0f || x == 1f) return 0f;
-                if (Mathf.Approximately(x, 0.5f)) return BIG_TANGENT;
+                if (Mathf.Approximately(x, 0.5f)) return 0;
 
                 if (x < 0.5f) {
                     float term_2x = 2f * x;
@@ -785,6 +785,27 @@ namespace EasyStateful.Runtime {
                         
                         return new AnimationCurve(keys);
                     }
+                case Stateful.Runtime.Ease.Flash:
+                    // Changes instantly midway (0 for x<0.5, 1 for x>=0.5)
+                    return new AnimationCurve(
+                        new Keyframe(0f, 0f, 0f, 0f),
+                        new Keyframe(0.499f, 0f, 0f, 0f),
+                        new Keyframe(0.5f, 1f, 0f, 0f),
+                        new Keyframe(1f, 1f, 0f, 0f)
+                    );
+                case Stateful.Runtime.Ease.InFlash:
+                    // Always 1
+                    return new AnimationCurve(
+                        new Keyframe(0f, 1f, 0f, 0f),
+                        new Keyframe(1f, 1f, 0f, 0f)
+                    );
+                case Stateful.Runtime.Ease.OutFlash:
+                    // 0, but jumps to 1 at end
+                    return new AnimationCurve(
+                        new Keyframe(0f, 0f, 0f, 0f),
+                        new Keyframe(0.999f, 0f, 0f, 0f),
+                        new Keyframe(1f, 1f, 0f, 0f)
+                    );
                 default:
                     return AnimationCurve.Linear(0, 0, 1, 1);
             }
