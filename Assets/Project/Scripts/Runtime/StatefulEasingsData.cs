@@ -14,10 +14,14 @@ namespace EasyStateful.Runtime {
         private const float ELASTIC_C5 = (2f * Mathf.PI) / 4.5f;
 
         // Constants for Back Easing
-        private const float BACK_C1 = 1.70158f;
-        private const float BACK_C3 = BACK_C1 + 1f; // Used for InBack and OutBack
-        private const float BACK_C2 = BACK_C1 * 1.525f; // Used for InOutBack overshoot adjustment
-        private const float BACK_C4 = BACK_C2 + 1f; // Used for InOutBack
+        private const float BACK_C1 = 1.0f;
+        private const float BACK_C3 = BACK_C1 + 1f;
+        private const float BACK_C2 = BACK_C1 * 1.525f;
+        private const float BACK_C4 = BACK_C2 + 1f;
+
+        // Constants for Bounce Easing
+        private const float BOUNCE_N1 = 7.5625f;
+        private const float BOUNCE_D1 = 2.75f;
 
         private void OnValidate()
         {
@@ -41,32 +45,39 @@ namespace EasyStateful.Runtime {
             }
         }
 
-        // Helper for creating elastic keyframes
-        private static Keyframe[] CreateElasticKeyframes(System.Func<float, float> valFunc, System.Func<float, float> derivFunc, float[] times, bool flatStartTangent = false, bool flatEndTangent = false)
+        // Helper for creating keyframes
+        // For smooth curves, inDerivFunc and outDerivFunc will be the same.
+        // For curves with corners (like Bounce), they can be different.
+        private static Keyframe[] CreateKeyframes(
+            System.Func<float, float> valFunc, 
+            System.Func<float, float> inDerivFunc, 
+            System.Func<float, float> outDerivFunc, 
+            float[] times, 
+            bool forceFlatStart = false, 
+            bool forceFlatEnd = false    
+        )
         {
             Keyframe[] keys = new Keyframe[times.Length];
             for (int i = 0; i < times.Length; ++i)
             {
                 float t = times[i];
                 float val = valFunc(t);
-                float deriv = derivFunc(t); 
+                float inT = inDerivFunc(t);
+                float outT = outDerivFunc(t);
                 
-                float inT = deriv, outT = deriv;
-                float inW = 1/3f, outW = 1/3f; 
-
-                if (Mathf.Approximately(inT, 0f)) inW = 0f;
-                if (Mathf.Approximately(outT, 0f)) outW = 0f;
+                float inW = Mathf.Approximately(inT, 0f) ? 0f : 1/3f;
+                float outW = Mathf.Approximately(outT, 0f) ? 0f : 1/3f;
                 
                 keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
-                keys[i].weightedMode = WeightedMode.Both;
+                keys[i].weightedMode = WeightedMode.Both; 
             }
 
             if (keys.Length > 0) {
-                if (flatStartTangent) {
+                if (forceFlatStart) {
                     keys[0].inTangent = 0f; keys[0].outTangent = 0f;
                     keys[0].inWeight = 0f; keys[0].outWeight = 0f;
                 }
-                if (flatEndTangent && keys.Length > 1) {
+                if (forceFlatEnd && keys.Length > 1) {
                     keys[keys.Length-1].inTangent = 0f; keys[keys.Length-1].outTangent = 0f;
                     keys[keys.Length-1].inWeight = 0f; keys[keys.Length-1].outWeight = 0f;
                 }
@@ -215,6 +226,122 @@ namespace EasyStateful.Runtime {
                 float t = (x * 2f) - 2f;
                 return 3f * BACK_C4 * t * t + 2f * BACK_C2 * t;
             }
+        }
+
+        // Bounce easing value functions
+        private static float CalculateOutBounce_Val(float x) {
+            if (x < 1f / BOUNCE_D1) {
+                return BOUNCE_N1 * x * x;
+            } else if (x < 2f / BOUNCE_D1) {
+                float x_shifted = x - (1.5f / BOUNCE_D1);
+                return BOUNCE_N1 * x_shifted * x_shifted + 0.75f;
+            } else if (x < 2.5f / BOUNCE_D1) {
+                float x_shifted = x - (2.25f / BOUNCE_D1);
+                return BOUNCE_N1 * x_shifted * x_shifted + 0.9375f;
+            } else {
+                float x_shifted = x - (2.625f / BOUNCE_D1);
+                return BOUNCE_N1 * x_shifted * x_shifted + 0.984375f;
+            }
+        }
+
+        private static float CalculateInBounce_Val(float x) {
+            if (x == 0f) return 0f;
+            if (x == 1f) return 1f;
+            return 1f - CalculateOutBounce_Val(1f - x);
+        }
+
+        private static float CalculateInOutBounce_Val(float x) {
+            if (x == 0f) return 0f;
+            if (x == 1f) return 1f;
+            if (x < 0.5f) {
+                return (1f - CalculateOutBounce_Val(1f - 2f * x)) / 2f;
+            } else {
+                return (1f + CalculateOutBounce_Val(2f * x - 1f)) / 2f;
+            }
+        }
+
+        // Bounce easing derivative functions
+        private static float CalculateOutBounce_Deriv(float x) {
+            if (x < 0f) x = 0f; // Clamp for safety if called outside [0,1]
+            if (x > 1f) x = 1f;
+
+            if (x < 1f / BOUNCE_D1) { // Segment 1: 0 to 1/D1
+                // y = N1*t^2
+                // y' = 2*N1*t
+                return 2f * BOUNCE_N1 * x;
+            } else if (x < 2f / BOUNCE_D1) { // Segment 2: 1/D1 to 2/D1
+                // y = N1*(t-k1)^2 + c1, k1 = 1.5/D1
+                // y' = 2*N1*(t-k1)
+                return 2f * BOUNCE_N1 * (x - 1.5f / BOUNCE_D1);
+            } else if (x < 2.5f / BOUNCE_D1) { // Segment 3: 2/D1 to 2.5/D1
+                // y = N1*(t-k2)^2 + c2, k2 = 2.25/D1
+                // y' = 2*N1*(t-k2)
+                return 2f * BOUNCE_N1 * (x - 2.25f / BOUNCE_D1);
+            } else { // Segment 4: 2.5/D1 to 1
+                // y = N1*(t-k3)^2 + c3, k3 = 2.625/D1
+                // y' = 2*N1*(t-k3)
+                return 2f * BOUNCE_N1 * (x - 2.625f / BOUNCE_D1);
+            }
+        }
+
+        private static float CalculateOutBounce_InDeriv(float t) {
+            if (Mathf.Approximately(t, 0f)) return 0f;
+
+            // Derivative of segment ending at t
+            if (t > 2.5f / BOUNCE_D1) { // Segment 4 (ending at t, or t is inside)
+                return 2f * BOUNCE_N1 * (t - 2.625f / BOUNCE_D1);
+            } else if (t > 2f / BOUNCE_D1) { // Segment 3
+                return 2f * BOUNCE_N1 * (t - 2.25f / BOUNCE_D1);
+            } else if (t > 1f / BOUNCE_D1) { // Segment 2
+                return 2f * BOUNCE_N1 * (t - 1.5f / BOUNCE_D1);
+            } else { // Segment 1 (t > 0)
+                return 2f * BOUNCE_N1 * t;
+            }
+        }
+        
+        private static float CalculateOutBounce_OutDeriv(float t) { // Renamed for clarity
+            return CalculateOutBounce_Deriv(t);
+        }
+
+        private static float CalculateInBounce_InDeriv(float x) {
+            // InDeriv_g(x) = OutDeriv_f(1-x)
+            return CalculateOutBounce_OutDeriv(1f - x);
+        }
+        private static float CalculateInBounce_OutDeriv(float x) {
+            // OutDeriv_g(x) = InDeriv_f(1-x)
+            return CalculateOutBounce_InDeriv(1f - x);
+        }
+
+        private static float CalculateInOutBounce_InDeriv(float x) {
+            if (x < 0.5f) { // Corresponds to InBounce part: InDeriv_g(x) = OutDeriv_f(1-2x)
+                return CalculateOutBounce_OutDeriv(1f - 2f * x);
+            } else { // Corresponds to OutBounce part: InDeriv_g(x) = InDeriv_f(2x-1)
+                return CalculateOutBounce_InDeriv(2f * x - 1f);
+            }
+        }
+        private static float CalculateInOutBounce_OutDeriv(float x) {
+            if (x < 0.5f) { // Corresponds to InBounce part: OutDeriv_g(x) = InDeriv_f(1-2x)
+                return CalculateOutBounce_InDeriv(1f - 2f * x);
+            } else { // Corresponds to OutBounce part: OutDeriv_g(x) = OutDeriv_f(2x-1)
+                return CalculateOutBounce_OutDeriv(2f * x - 1f);
+            }
+        }
+
+        private static float[] GetUniqueSortedTimes(System.Collections.Generic.List<float> timesList)
+        {
+            if (timesList == null || timesList.Count == 0) return new float[0];
+            
+            timesList.Sort();
+            System.Collections.Generic.List<float> unique_times = new System.Collections.Generic.List<float>();
+            if (timesList.Count > 0) {
+                unique_times.Add(timesList[0]);
+                for (int i = 1; i < timesList.Count; ++i) {
+                    if (!Mathf.Approximately(timesList[i], timesList[i-1])) {
+                        unique_times.Add(timesList[i]);
+                    }
+                }
+            }
+            return unique_times.ToArray();
         }
 
         public static AnimationCurve GetDefaultCurve(Stateful.Runtime.Ease ease)
@@ -391,211 +518,273 @@ namespace EasyStateful.Runtime {
                         new Keyframe(1f, 1f, 0f, 0f)
                     );
                 case Stateful.Runtime.Ease.InExpo:
-                    // y = x==0 ? 0 : pow(2, 10 * (x - 1)), dy/dx = 10 * ln(2) * pow(2, 10 * (x - 1))
-                    return new AnimationCurve(
-                        new Keyframe(0f, 0f, 0f, 0f),
-                        new Keyframe(0.1f, Mathf.Pow(2f, 10f * (0.1f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.1f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.1f - 1f))),
-                        new Keyframe(0.25f, Mathf.Pow(2f, 10f * (0.25f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.25f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.25f - 1f))),
-                        new Keyframe(0.5f, Mathf.Pow(2f, 10f * (0.5f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.5f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.5f - 1f))),
-                        new Keyframe(0.75f, Mathf.Pow(2f, 10f * (0.75f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.75f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.75f - 1f))),
-                        new Keyframe(0.9f, Mathf.Pow(2f, 10f * (0.9f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.9f - 1f)), 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (0.9f - 1f))),
-                        new Keyframe(1f, 1f, 10f * Mathf.Log(2f), 10f * Mathf.Log(2f))
-                    );
+                    float[] inExpoTimes = {0f, 0.1f, 0.25f, 0.5f, 0.75f, 0.9f, 1f};
+                     // For InExpo, deriv at 0 is 0, deriv at 1 is large
+                    Keyframe[] inExpoKeys = CreateKeyframes(
+                        x => (x == 0f) ? 0f : Mathf.Pow(2f, 10f * (x - 1f)),
+                        x => (x == 0f) ? 0f : 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (x-1f)),
+                        x => (x == 0f) ? 0f : 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (x-1f)),
+                        inExpoTimes, forceFlatStart: true, forceFlatEnd: false);
+                    return new AnimationCurve(inExpoKeys);
                 case Stateful.Runtime.Ease.OutExpo:
-                    // y = x==1 ? 1 : 1 - pow(2, -10 * x), dy/dx = 10 * ln(2) * pow(2, -10 * x)
-                    return new AnimationCurve(
-                        new Keyframe(0f, 0f, 10f * Mathf.Log(2f), 10f * Mathf.Log(2f)),
-                        new Keyframe(0.1f, 1f - Mathf.Pow(2f, -10f * 0.1f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.1f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.1f)),
-                        new Keyframe(0.25f, 1f - Mathf.Pow(2f, -10f * 0.25f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.25f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.25f)),
-                        new Keyframe(0.5f, 1f - Mathf.Pow(2f, -10f * 0.5f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.5f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.5f)),
-                        new Keyframe(0.75f, 1f - Mathf.Pow(2f, -10f * 0.75f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.75f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.75f)),
-                        new Keyframe(0.9f, 1f - Mathf.Pow(2f, -10f * 0.9f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.9f), 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * 0.9f)),
-                        new Keyframe(1f, 1f, 0f, 0f)
-                    );
+                    float[] outExpoTimes = {0f, 0.1f, 0.25f, 0.5f, 0.75f, 0.9f, 1f};
+                    // For OutExpo, deriv at 0 is large, deriv at 1 is 0
+                    Keyframe[] outExpoKeys = CreateKeyframes(
+                        x => (x == 1f) ? 1f : 1f - Mathf.Pow(2f, -10f * x),
+                        x => (x == 1f) ? 0f : 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * x),
+                        x => (x == 1f) ? 0f : 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * x),
+                        outExpoTimes, forceFlatStart: false, forceFlatEnd: true);
+                    return new AnimationCurve(outExpoKeys);
                 case Stateful.Runtime.Ease.InOutExpo:
-                    float[] expoKeys3 = {0f, 0.05f, 0.1f, 0.2f, 0.3f, 0.5f, 0.7f, 0.8f, 0.9f, 0.95f, 1f};
-                    Keyframe[] expoFrames3 = new Keyframe[expoKeys3.Length];
-                    for (int i = 0; i < expoKeys3.Length; i++) {
-                        float x = expoKeys3[i];
-                        float y;
-                        float key_inTangent = 0f, key_outTangent = 0f;
-                        float key_inWeight = 1/3f, key_outWeight = 1/3f;
-                        
-                        if (x == 0f) { 
-                            y = 0f; 
-                            key_inTangent = 0f; 
-                            key_outTangent = 0f; 
-                        }
-                        else if (x == 1f) { 
-                            y = 1f; 
-                            key_inTangent = 0f; 
-                            key_outTangent = 0f; 
-                        }
-                        else { 
-                            float tangentValue;
-                            if (x < 0.5f) {
-                                // y = 0.5 * 2^(20x - 10)
-                                // dy/dx = 10 * ln(2) * 2^(20x - 10)
-                                y = 0.5f * Mathf.Pow(2f, 20f * x - 10f);
-                                tangentValue = 10f * Mathf.Log(2f) * Mathf.Pow(2f, 20f * x - 10f); 
-                            } else if (x > 0.5f) {
-                                // y = 1 - 0.5 * 2^(-20x + 10)
-                                // dy/dx = 10 * ln(2) * 2^(-20x + 10)
-                                y = 1f - 0.5f * Mathf.Pow(2f, -20f * x + 10f);
-                                tangentValue = 10f * Mathf.Log(2f) * Mathf.Pow(2f, -20f * x + 10f); 
-                            } else { // x == 0.5
-                                y = 0.5f;
-                                tangentValue = 10f * Mathf.Log(2f); // dy/dx at x=0.5
-                            }
-                            key_inTangent = tangentValue;
-                            key_outTangent = tangentValue;
-                        }
-
-                        // Set weights for expo (generally smooth, but flat at ends)
-                        if (Mathf.Approximately(key_inTangent, 0f)) key_inWeight = 0f;
-                        if (Mathf.Approximately(key_outTangent, 0f)) key_outWeight = 0f;
-                        
-                        expoFrames3[i] = new Keyframe(x, y, key_inTangent, key_outTangent, key_inWeight, key_outWeight);
-                        expoFrames3[i].weightedMode = WeightedMode.Both;
-                    }
-                    return new AnimationCurve(expoFrames3);
+                    // y = x<0.5 ? 0.5 * 2^(20x-10) : 1-0.5*2^(-20x+10)
+                    // dy/dx = x<0.5 ? 10*ln2*2^(20x-10) : 10*ln2*2^(-20x+10)
+                    // Deriv at 0 is 0, at 0.5 is 10*ln2, at 1 is 0.
+                    System.Func<float,float> inOutExpoVal = x => {
+                        if (x == 0f) return 0f; if (x == 1f) return 1f; if (x == 0.5f) return 0.5f;
+                        if (x < 0.5f) return 0.5f * Mathf.Pow(2f, 20f * x - 10f);
+                        return 1f - 0.5f * Mathf.Pow(2f, -20f * x + 10f);
+                    };
+                     System.Func<float,float> inOutExpoDeriv = x => {
+                        if (x == 0f || x == 1f) return 0f;
+                        if (Mathf.Approximately(x,0.5f)) return 10f * Mathf.Log(2f); // Peak derivative
+                        if (x < 0.5f) return 10f * Mathf.Log(2f) * Mathf.Pow(2f, 20f * x - 10f);
+                        return 10f * Mathf.Log(2f) * Mathf.Pow(2f, -20f * x + 10f);
+                    };
+                    float[] inOutExpoTimes = {0f, 0.05f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 0.95f, 1f};
+                    Keyframe[] inOutExpoKeys = CreateKeyframes(inOutExpoVal, inOutExpoDeriv, inOutExpoDeriv, inOutExpoTimes, forceFlatStart: true, forceFlatEnd: true);
+                    return new AnimationCurve(inOutExpoKeys);
                 case Stateful.Runtime.Ease.InCirc:
                     {
                         float[] times = {0f, 0.25f, 0.5f, 0.75f, 0.9f, 0.95f, 0.99f, 1f};
-                        Keyframe[] keys = new Keyframe[times.Length];
-                        for(int i=0; i < times.Length; ++i)
-                        {
-                            float t = times[i];
-                            float val = CalculateInCirc_Val(t);
-                            float deriv_val = CalculateInCirc_Deriv(t);
-                            
-                            float inT, outT;
-                            float inW = 1/3f, outW = 1/3f;
-
-                            if (t == 0f) {
-                                inT = 0f; outT = 0f; // Start is flat
-                            } else if (t == 1f) {
-                                inT = deriv_val; // deriv_val will be BIG_TANGENT
-                                outT = 0f;      // End is flat out
-                            } else {
-                                inT = deriv_val;
-                                outT = deriv_val;
-                            }
-
-                            if (Mathf.Approximately(inT, 0f) || Mathf.Approximately(inT, BIG_TANGENT)) inW = 0f;
-                            if (Mathf.Approximately(outT, 0f) || Mathf.Approximately(outT, BIG_TANGENT)) outW = 0f;
-                            
-                            keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
-                            keys[i].weightedMode = WeightedMode.Both;
-                        }
+                        Keyframe[] keys = CreateKeyframes(CalculateInCirc_Val, CalculateInCirc_Deriv, CalculateInCirc_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.OutCirc:
                      {
                         float[] times = {0f, 0.01f, 0.05f, 0.1f, 0.25f, 0.5f, 0.75f, 1f};
-                        Keyframe[] keys = new Keyframe[times.Length];
-                        for(int i=0; i < times.Length; ++i)
-                        {
-                            float t = times[i];
-                            float val = CalculateOutCirc_Val(t);
-                            float deriv_val = CalculateOutCirc_Deriv(t);
-
-                            float inT, outT;
-                            float inW = 1/3f, outW = 1/3f;
-
-                            if (t == 0f) {
-                                inT = 0f;       // Start is flat in
-                                outT = deriv_val; // deriv_val will be BIG_TANGENT
-                            } else if (t == 1f) {
-                                inT = 0f; outT = 0f; // End is flat
-                            } else {
-                                inT = deriv_val;
-                                outT = deriv_val;
-                            }
-                            
-                            if (Mathf.Approximately(inT, 0f) || Mathf.Approximately(inT, BIG_TANGENT)) inW = 0f;
-                            if (Mathf.Approximately(outT, 0f) || Mathf.Approximately(outT, BIG_TANGENT)) outW = 0f;
-
-                            keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
-                            keys[i].weightedMode = WeightedMode.Both;
-                        }
+                        Keyframe[] keys = CreateKeyframes(CalculateOutCirc_Val, CalculateOutCirc_Deriv, CalculateOutCirc_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.InOutCirc:
                     {
                         float[] times = {0f, 0.1f, 0.25f, 0.4f, 0.45f, 0.49f, 0.5f, 0.51f, 0.55f, 0.6f, 0.75f, 0.9f, 1f};
-                        Keyframe[] keys = new Keyframe[times.Length];
-                        for(int i=0; i < times.Length; ++i)
-                        {
-                            float t = times[i];
-                            float val = CalculateInOutCirc_Val(t);
-                            float deriv_val = CalculateInOutCirc_Deriv(t);
-                            
-                            float inT = deriv_val, outT = deriv_val;
-                            float inW = 1/3f, outW = 1/3f;
-
-                            if(t == 0f || t == 1f) { // Start and End are flat
-                                inT = 0f; outT = 0f;
-                            }
-                            // For t = 0.5f, deriv_val is already BIG_TANGENT from CalculateInOutCirc_Deriv
-
-                            if (Mathf.Approximately(inT, 0f) || Mathf.Approximately(inT, BIG_TANGENT)) inW = 0f;
-                            if (Mathf.Approximately(outT, 0f) || Mathf.Approximately(outT, BIG_TANGENT)) outW = 0f;
-                            
-                            keys[i] = new Keyframe(t, val, inT, outT, inW, outW);
-                            keys[i].weightedMode = WeightedMode.Both;
-                        }
+                        Keyframe[] keys = CreateKeyframes(CalculateInOutCirc_Val, CalculateInOutCirc_Deriv, CalculateInOutCirc_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.InElastic:
                     {
                         float[] times = {0f, 0.05f, 0.15f, .3f, .45f, 0.6f, 0.7f, 0.775f, 0.85f, 0.925f, 0.97f, 1f};
-                        Keyframe[] keys = CreateElasticKeyframes(CalculateInElastic_Val, CalculateInElastic_Deriv, times, flatStartTangent: true);
+                        Keyframe[] keys = CreateKeyframes(CalculateInElastic_Val, CalculateInElastic_Deriv, CalculateInElastic_Deriv, times, true);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.OutElastic:
                     {
                         float[] times = {0f, 0.03f, 0.075f, 0.15f, 0.225f, 0.3f, 0.4f, .55f, .7f, 0.85f, 0.95f, 1f};
-                        Keyframe[] keys = CreateElasticKeyframes(CalculateOutElastic_Val, CalculateOutElastic_Deriv, times, flatEndTangent: true);
+                        Keyframe[] keys = CreateKeyframes(CalculateOutElastic_Val, CalculateOutElastic_Deriv, CalculateOutElastic_Deriv, times, true);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.InOutElastic:
                     {
                         float[] times = {0f, 0.05f, 0.15f, 0.25f, 0.35f, 0.44375f, 0.5f, 0.55625f, 0.65f, 0.75f, 0.85f, 0.95f, 1f};
-                        Keyframe[] keys = CreateElasticKeyframes(CalculateInOutElastic_Val, CalculateInOutElastic_Deriv, times, flatStartTangent: true, flatEndTangent: true);
+                        Keyframe[] keys = CreateKeyframes(CalculateInOutElastic_Val, CalculateInOutElastic_Deriv, CalculateInOutElastic_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.InBack:
                     {
                         float overshootTime = (2f * BACK_C1) / (3f * BACK_C3); // approx 0.4199f
-                        // Added 0.1f to help maintain initial flatness
                         float[] times = {0f, 0.1f, overshootTime, overshootTime + (1f - overshootTime) * 0.5f, 1f}; 
-                        Keyframe[] keys = CreateElasticKeyframes(CalculateInBack_Val, CalculateInBack_Deriv, times, flatStartTangent: true, flatEndTangent: false);
+                        Keyframe[] keys = CreateKeyframes(CalculateInBack_Val, CalculateInBack_Deriv, CalculateInBack_Deriv, times, true, false);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.OutBack:
                     {
                         float overshootCalc = (2f * BACK_C1) / (3f * BACK_C3);
                         float overshootTime = 1f - overshootCalc; // approx 0.5801f
-                        // Added 0.9f to help maintain final flatness
                         float[] times = {0f, overshootTime * 0.5f, overshootTime, 0.9f, 1f}; 
-                        Keyframe[] keys = CreateElasticKeyframes(CalculateOutBack_Val, CalculateOutBack_Deriv, times, flatStartTangent: false, flatEndTangent: true);
+                        Keyframe[] keys = CreateKeyframes(CalculateOutBack_Val, CalculateOutBack_Deriv, CalculateOutBack_Deriv, times, false, true);
                         return new AnimationCurve(keys);
                     }
                 case Stateful.Runtime.Ease.InOutBack:
                     {
-                        float overshoot1Time = BACK_C2 / (3f * BACK_C4); // approx 0.2406f (time of first max overshoot for the 0-0.5 part, scaled to 0-0.5)
-                        float actualOvershoot1Time = overshoot1Time * 0.5f; // Scaled to 0-1 range for x
-                        
-                        float overshoot2TimeRelative = BACK_C2 / (3f * BACK_C4); // Same relative overshoot point for the 0.5-1 part
-                        float actualOvershoot2Time = 0.5f + (overshoot2TimeRelative * 0.5f); // Scaled and shifted for 0-1 range for x
-
-                        // Added 0.05f and 0.95f for initial/final flatness
+                        float overshoot1Time = BACK_C2 / (3f * BACK_C4); 
+                        float actualOvershoot1Time = overshoot1Time * 0.5f; 
+                        float overshoot2TimeRelative = BACK_C2 / (3f * BACK_C4); 
+                        float actualOvershoot2Time = 0.5f + (overshoot2TimeRelative * 0.5f); 
                         float[] times = {0f, 0.05f, actualOvershoot1Time, 0.5f, actualOvershoot2Time, 0.95f, 1f};
-                        Keyframe[] keys = CreateElasticKeyframes(CalculateInOutBack_Val, CalculateInOutBack_Deriv, times, flatStartTangent: true, flatEndTangent: true);
+                        Keyframe[] keys = CreateKeyframes(CalculateInOutBack_Val, CalculateInOutBack_Deriv, CalculateInOutBack_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
-                // For Elastic, Back, Bounce, Flash, etc., you may want to use custom or hand-tuned curves or leave as linear for now.
+                case Stateful.Runtime.Ease.InBounce:
+                    {
+                        float[] p_out_crit_times = {
+                            0f, 1f/BOUNCE_D1, 1.5f/BOUNCE_D1, 2f/BOUNCE_D1, 
+                            2.25f/BOUNCE_D1, 2.5f/BOUNCE_D1, 2.625f/BOUNCE_D1, 1f
+                        };
+                        System.Collections.Generic.List<float> times_list = new System.Collections.Generic.List<float>();
+                        for(int i=0; i<p_out_crit_times.Length; ++i) times_list.Add(1f - p_out_crit_times[p_out_crit_times.Length - 1 - i]);
+                        
+                        // Focus sampling in the latter part (after ~0.4) where bounces occur
+                        // Add intermediary points between bounce peaks for smoother curves
+                        times_list.Add(0.4f);
+                        times_list.Add(0.5f);
+                        times_list.Add(0.6f);
+                        times_list.Add(0.7f);
+                        times_list.Add(0.8f);
+                        times_list.Add(0.85f);
+                        times_list.Add(0.9f);
+                        times_list.Add(0.95f);
+                        
+                        // Add extra points around the bounce peaks
+                        float peak1 = 1f - (2.5f/BOUNCE_D1);
+                        float peak2 = 1f - (2f/BOUNCE_D1);
+                        float peak3 = 1f - (1f/BOUNCE_D1);
+                        
+                        times_list.Add(peak1 - 0.03f);
+                        times_list.Add(peak1 + 0.03f);
+                        times_list.Add(peak2 - 0.03f);
+                        times_list.Add(peak2 + 0.03f);
+                        times_list.Add(peak3 - 0.03f);
+                        times_list.Add(peak3 + 0.03f);
+                        
+                        float[] uniqueTimes = GetUniqueSortedTimes(times_list);
+                        Keyframe[] keys = CreateKeyframes(CalculateInBounce_Val, CalculateInBounce_InDeriv, CalculateInBounce_OutDeriv, uniqueTimes, false, true);
+                        
+                        // Adjust weights at peaks for circular arcs
+                        for (int i = 0; i < keys.Length; i++) {
+                            float t = keys[i].time;
+                            if (Mathf.Approximately(t, peak1) || 
+                                Mathf.Approximately(t, peak2) || 
+                                Mathf.Approximately(t, peak3)) {
+                                keys[i].inWeight = 0.33f;
+                                keys[i].outWeight = 0.33f;
+                            }
+                        }
+                        
+                        return new AnimationCurve(keys);
+                    }
+                case Stateful.Runtime.Ease.OutBounce:
+                    {
+                        System.Collections.Generic.List<float> times_list = new System.Collections.Generic.List<float> {
+                            0f, 1f/BOUNCE_D1, 1.5f/BOUNCE_D1, 2f/BOUNCE_D1, 
+                            2.25f/BOUNCE_D1, 2.5f/BOUNCE_D1, 2.625f/BOUNCE_D1, 1f
+                        };
+                        
+                        // Add extra points near the bounce peaks for better circular shape
+                        times_list.Add(0.2f/BOUNCE_D1 - 0.05f);
+                        times_list.Add(0.2f/BOUNCE_D1 + 0.05f);
+                        times_list.Add(0.5f/BOUNCE_D1 - 0.05f);
+                        times_list.Add(0.5f/BOUNCE_D1 + 0.05f);
+                        times_list.Add(1f/BOUNCE_D1 - 0.05f);
+                        times_list.Add(1f/BOUNCE_D1 + 0.05f);
+                        times_list.Add(1.5f/BOUNCE_D1 - 0.05f);
+                        times_list.Add(1.5f/BOUNCE_D1 + 0.05f);
+                        times_list.Add(2f/BOUNCE_D1 - 0.05f);
+                        times_list.Add(2f/BOUNCE_D1 + 0.05f);
+                        times_list.Add(2.5f/BOUNCE_D1 - 0.05f);
+                        times_list.Add(2.5f/BOUNCE_D1 + 0.05f);
+                        
+                        float[] uniqueTimes = GetUniqueSortedTimes(times_list);
+                        Keyframe[] keys = CreateKeyframes(CalculateOutBounce_Val, CalculateOutBounce_InDeriv, CalculateOutBounce_OutDeriv, uniqueTimes, true, false);
+                        
+                        // Adjust tangent weights at bounce peaks for more circular arcs
+                        for (int i = 0; i < keys.Length; i++) {
+                            float t = keys[i].time;
+                            if (Mathf.Approximately(t, 1f/BOUNCE_D1) || 
+                                Mathf.Approximately(t, 2f/BOUNCE_D1) || 
+                                Mathf.Approximately(t, 2.5f/BOUNCE_D1)) {
+                                keys[i].inWeight = 0.33f;
+                                keys[i].outWeight = 0.33f;
+                            }
+                        }
+                        
+                        return new AnimationCurve(keys);
+                    }
+                case Stateful.Runtime.Ease.InOutBounce:
+                    {
+                        float[] p_out_crit_times = { 
+                            0f, 1f/BOUNCE_D1, 1.5f/BOUNCE_D1, 2f/BOUNCE_D1, 
+                            2.25f/BOUNCE_D1, 2.5f/BOUNCE_D1, 2.625f/BOUNCE_D1, 1f
+                        };
+                        System.Collections.Generic.List<float> times_list = new System.Collections.Generic.List<float>();
+                        
+                        // First half (InBounce scaled to [0, 0.5])
+                        for(int i=0; i < p_out_crit_times.Length; ++i) {
+                            times_list.Add((1f - p_out_crit_times[p_out_crit_times.Length - 1 - i]) / 2f);
+                        }
+                        
+                        // Add extra points for first half - focus on area closer to 0.5 (end of in-part)
+                        times_list.Add(0.2f);
+                        times_list.Add(0.25f);
+                        times_list.Add(0.3f);
+                        times_list.Add(0.35f);
+                        times_list.Add(0.4f);
+                        times_list.Add(0.425f);
+                        times_list.Add(0.45f);
+                        times_list.Add(0.475f);
+                        
+                        // Add extra points around the bounce peaks in first half
+                        float peak1 = (1f - (2.5f/BOUNCE_D1)) / 2f;
+                        float peak2 = (1f - (2f/BOUNCE_D1)) / 2f;
+                        float peak3 = (1f - (1f/BOUNCE_D1)) / 2f;
+                        
+                        times_list.Add(peak1 - 0.03f);
+                        times_list.Add(peak1 + 0.03f);
+                        times_list.Add(peak2 - 0.03f);
+                        times_list.Add(peak2 + 0.03f);
+                        times_list.Add(peak3 - 0.03f);
+                        times_list.Add(peak3 + 0.03f);
+                        
+                        // Second half (OutBounce scaled to [0.5, 1])
+                        for(int i=0; i < p_out_crit_times.Length; ++i) {
+                            times_list.Add((p_out_crit_times[i] + 1f) / 2f);
+                        }
+                        
+                        // Add extra points for second half
+                        times_list.Add(0.525f);
+                        times_list.Add(0.55f);
+                        times_list.Add(0.575f);
+                        times_list.Add(0.6f);
+                        times_list.Add(0.65f);
+                        times_list.Add(0.7f);
+                        times_list.Add(0.75f);
+                        times_list.Add(0.8f);
+                        
+                        // Add extra points around the bounce peaks in second half
+                        float peak4 = (1f/BOUNCE_D1 + 1f) / 2f;
+                        float peak5 = (2f/BOUNCE_D1 + 1f) / 2f;
+                        float peak6 = (2.5f/BOUNCE_D1 + 1f) / 2f;
+                        
+                        times_list.Add(peak4 - 0.03f);
+                        times_list.Add(peak4 + 0.03f);
+                        times_list.Add(peak5 - 0.03f);
+                        times_list.Add(peak5 + 0.03f);
+                        times_list.Add(peak6 - 0.03f);
+                        times_list.Add(peak6 + 0.03f);
+                        
+                        // Ensure key points are included
+                        if (!times_list.Exists(t => Mathf.Approximately(t,0f))) times_list.Add(0f);
+                        if (!times_list.Exists(t => Mathf.Approximately(t,0.5f))) times_list.Add(0.5f);
+                        if (!times_list.Exists(t => Mathf.Approximately(t,1f))) times_list.Add(1f);
+                        
+                        float[] uniqueTimes = GetUniqueSortedTimes(times_list);
+                        Keyframe[] keys = CreateKeyframes(CalculateInOutBounce_Val, CalculateInOutBounce_InDeriv, CalculateInOutBounce_OutDeriv, uniqueTimes, false, false);
+                        
+                        // Adjust weights at peaks for circular arcs on both halves
+                        float[] peakPoints = {peak1, peak2, peak3, peak4, peak5, peak6};
+                        
+                        for (int i = 0; i < keys.Length; i++) {
+                            float t = keys[i].time;
+                            for (int p = 0; p < peakPoints.Length; p++) {
+                                if (Mathf.Approximately(t, peakPoints[p])) {
+                                    keys[i].inWeight = 0.33f;
+                                    keys[i].outWeight = 0.33f;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        return new AnimationCurve(keys);
+                    }
                 default:
                     return AnimationCurve.Linear(0, 0, 1, 1);
             }
