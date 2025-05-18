@@ -193,6 +193,14 @@ namespace EasyStateful.Runtime {
         /// </summary>
         public void SnapToState(string stateName)
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                // In editor, always rebuild the cache before each state change for live preview
+                BuildPropertyTransitionCache();
+            }
+#endif
+
             if (stateMachine == null || stateMachine.states == null) return;
             var state = stateMachine.states.Find(s => s.name == stateName);
             if (state == null)
@@ -213,6 +221,14 @@ namespace EasyStateful.Runtime {
         /// </summary>
         public void TweenToState(string stateName, float? duration = null, Ease? ease = null)
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                // In editor, always rebuild the cache before each state change for live preview
+                BuildPropertyTransitionCache();
+            }
+#endif
+
             if (stateMachine == null || stateMachine.states == null)
             {
                 Debug.LogWarning($"State machine not loaded or has no states. Cannot tween to '{stateName}'.", this);
