@@ -1108,6 +1108,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -1297,6 +1298,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -1936,6 +1938,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -2125,6 +2128,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -3752,6 +3756,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -4317,12 +4322,13 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
   overrideDefaultEase: 0
   customDefaultEase: 1
-  editorClip: {fileID: 0}
+  editorClip: {fileID: 7400000, guid: f2d4372362b043b44aa62347587540bc, type: 2}
 --- !u!114 &624193422
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4924,6 +4930,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -5338,6 +5345,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -6662,6 +6670,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -6851,6 +6860,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -7393,6 +7403,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -7882,6 +7893,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -8221,6 +8233,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -9087,6 +9100,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -10037,6 +10051,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -11179,6 +11194,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -12296,6 +12312,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -12560,6 +12577,7 @@ MonoBehaviour:
   stateNames:
   - Default
   - Hidden
+  - Red
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -13384,7 +13402,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5740525771424530030, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
       propertyPath: m_Color.a
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5740525771424530030, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
       propertyPath: m_Color.b
@@ -13484,7 +13502,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8447858495932059257, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
       propertyPath: m_Color.a
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8447858495932059257, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
       propertyPath: m_Color.b
@@ -13496,7 +13514,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8542167721868824904, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
       propertyPath: m_Color.a
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8542167721868824904, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
       propertyPath: m_Color.b

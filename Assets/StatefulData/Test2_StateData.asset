@@ -80,3 +80,36 @@ MonoBehaviour:
         propertyName: m_Color.a
         value: 0
         objectReference: 
+    - name: Red
+      time: 0.033333335
+      properties:
+      - path: 
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 200
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
