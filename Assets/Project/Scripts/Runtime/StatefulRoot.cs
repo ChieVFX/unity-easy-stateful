@@ -565,6 +565,7 @@ namespace EasyStateful.Runtime {
         }
 
         [ContextMenu("Update State Names Array")]
+        #endif
         public void UpdateStateNamesArray()
         {
             if (stateMachine != null && stateMachine.states != null)
@@ -572,9 +573,12 @@ namespace EasyStateful.Runtime {
             else
                 stateNames = new string[0];
             
+            #if UNITY_EDITOR
             if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(this);
+            #endif
         }
 
+        #if UNITY_EDITOR
         public void UpdateStateNamesFromClip(AnimationClip clip)
         {
             if (clip != null)
