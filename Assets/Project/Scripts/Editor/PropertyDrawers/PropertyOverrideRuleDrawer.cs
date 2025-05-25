@@ -30,6 +30,7 @@ namespace EasyStateful.Editor {
 
                 SerializedProperty propName = property.FindPropertyRelative("propertyName");
                 SerializedProperty compType = property.FindPropertyRelative("componentType");
+                SerializedProperty pathWildcard = property.FindPropertyRelative("pathWildcard");
                 SerializedProperty overrideEaseProp = property.FindPropertyRelative("overrideEase");
                 SerializedProperty easeProp = property.FindPropertyRelative("ease");
                 SerializedProperty instantEnableDelayedDisableProp = property.FindPropertyRelative("instantEnableDelayedDisable");
@@ -38,6 +39,9 @@ namespace EasyStateful.Editor {
                 currentRect.y += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
                 EditorGUI.PropertyField(currentRect, compType, new GUIContent("Component Type (Optional)"));
+                currentRect.y += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
+
+                EditorGUI.PropertyField(currentRect, pathWildcard, new GUIContent("Path Wildcard (Optional)", "e.g., '*_first', '*button*', 'menu/*'"));
                 currentRect.y += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
                 
                 // "Instant Change" toggle - always visible
@@ -83,7 +87,7 @@ namespace EasyStateful.Editor {
             {
                 height += EditorGUIUtility.standardVerticalSpacing; // Space after foldout
                 
-                height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing) * 2; // propName, compType
+                height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing) * 3; // propName, compType, pathWildcard
                 height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing); // "Instant Change" line
 
                 SerializedProperty instantEnableDelayedDisableProp = property.FindPropertyRelative("instantEnableDelayedDisable");

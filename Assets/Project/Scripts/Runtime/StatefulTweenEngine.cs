@@ -116,7 +116,7 @@ namespace EasyStateful.Runtime
                     // Always resolve transition info live in editor
                     finalPropDuration = duration;
                     finalPropEase = ease;
-                    var rule = settingsResolver.GetPropertyOverrideRule(prop.propertyName, prop.componentType);
+                    var rule = settingsResolver.GetPropertyOverrideRule(prop.propertyName, prop.componentType, prop.path);
                     if (rule != null)
                     {
                         if (rule.instantEnableDelayedDisable && prop.propertyName == "m_IsActive")

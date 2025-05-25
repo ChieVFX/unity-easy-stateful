@@ -16,4 +16,10 @@ MonoBehaviour:
   customDefaultTransitionTime: 5
   overrideGlobalDefaultEase: 0
   customDefaultEase: 7
-  propertyOverrides: []
+  propertyOverrides:
+  - propertyName: 
+    componentType: 
+    pathWildcard: '*_first*'
+    overrideEase: 1
+    ease: 1
+    instantEnableDelayedDisable: 0

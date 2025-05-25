@@ -83,20 +83,34 @@ namespace EasyStateful.Runtime {
         public static string DefaultAnimationSavePath => Data.defaultAnimationSavePath ?? "";
 
         // This method now specifically gets rules from the GLOBAL settings.
-        public static PropertyOverrideRule GetGlobalPropertyOverrideRule(string propertyName, string componentTypeFullName)
+        public static PropertyOverrideRule GetGlobalPropertyOverrideRule(string propertyName, string componentTypeFullName, string path = "")
         {
             if (Data == null || Data.propertyOverrides == null) return null;
 
+            // If path is provided, check for wildcard matches first
+            if (!string.IsNullOrEmpty(path))
+            {
+                foreach (var rule in Data.propertyOverrides)
+                {
+                    if (rule.Matches(propertyName, componentTypeFullName, path))
+                        return rule;
+                }
+                return null;
+            }
+
+            // Fallback to original logic for backward compatibility
             var specificRule = Data.propertyOverrides.FirstOrDefault(r =>
                 r.propertyName == propertyName &&
                 !string.IsNullOrEmpty(r.componentType) &&
-                r.componentType == componentTypeFullName);
+                r.componentType == componentTypeFullName &&
+                string.IsNullOrEmpty(r.pathWildcard));
 
             if (specificRule != null) return specificRule;
 
             var generalRule = Data.propertyOverrides.FirstOrDefault(r =>
                 r.propertyName == propertyName &&
-                string.IsNullOrEmpty(r.componentType));
+                string.IsNullOrEmpty(r.componentType) &&
+                string.IsNullOrEmpty(r.pathWildcard));
 
             return generalRule;
         }

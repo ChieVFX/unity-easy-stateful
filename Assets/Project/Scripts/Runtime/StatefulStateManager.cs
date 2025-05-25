@@ -63,7 +63,7 @@ namespace EasyStateful.Runtime
                     Ease ease = settingsResolver.GetEffectiveEase();
                     bool instantEnableDelayedDisable = false;
 
-                    var rule = settingsResolver.GetPropertyOverrideRule(prop.propertyName, prop.componentType);
+                    var rule = settingsResolver.GetPropertyOverrideRule(prop.propertyName, prop.componentType, prop.path);
                     if (rule != null)
                     {
                         if (rule.overrideEase) ease = rule.ease;
