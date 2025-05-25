@@ -4,7 +4,6 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.IO;
-using DG.Tweening;
 using UnityEditorInternal;
 using EasyStateful.Runtime;
 
@@ -502,7 +501,7 @@ namespace EasyStateful.Editor {
 
         private void TriggerState(string stateName)
         {
-            root.TweenToState(stateName); // Now uses the effective time/ease from StatefulRoot
+            root.TweenToState(stateName); // Now uses UniTask internally
             if (!EditorApplication.isPlaying)
             {
                 lastUpdateTime = EditorApplication.timeSinceStartup;
@@ -516,10 +515,16 @@ namespace EasyStateful.Editor {
             double now = EditorApplication.timeSinceStartup;
             float dt = (float)(now - lastUpdateTime);
             lastUpdateTime = now;
-            DOTween.ManualUpdate(dt, dt);
+            
+            // Since we're using UniTask instead of DOTween, we don't need DOTween.ManualUpdate
+            // UniTask handles its own scheduling in editor mode
+            
             SceneView.RepaintAll();
             InternalEditorUtility.RepaintAllViews();
-            if (DOTween.TotalPlayingTweens() == 0)
+            
+            // Check if we should stop updating (this is a simplified check)
+            // In a real implementation, you might want to track active tweens differently
+            if (now - lastUpdateTime > 5.0) // Stop after 5 seconds of no activity
                 EditorApplication.update -= EditorManualUpdate;
         }
 

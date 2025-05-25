@@ -1,5 +1,4 @@
 using UnityEngine;
-using DG.Tweening;
 using System.Collections.Generic;
 
 namespace EasyStateful.Runtime {
@@ -20,10 +19,9 @@ namespace EasyStateful.Runtime {
         {
             propertyName = propName;
             componentType = compType;
-            if (useInstantChange)
+            instantEnableDelayedDisable = useInstantChange;
+            if (useLinearEase)
             {
-                instantEnableDelayedDisable = true;
-            } else if (useLinearEase) {
                 overrideEase = true;
                 ease = Ease.Linear;
             }

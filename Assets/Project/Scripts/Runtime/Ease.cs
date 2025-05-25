@@ -1,4 +1,4 @@
-namespace Stateful.Runtime
+namespace EasyStateful.Runtime
 {   
     public enum Ease
     {

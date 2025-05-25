@@ -9,8 +9,8 @@ namespace EasyStateful.Editor {
         public override void OnInspectorGUI()
         {
             var data = (StatefulEasingsData)target;
-            var easeNames = System.Enum.GetNames(typeof(Stateful.Runtime.Ease));
-            var easeValues = System.Enum.GetValues(typeof(Stateful.Runtime.Ease));
+            var easeNames = System.Enum.GetNames(typeof(Ease));
+            var easeValues = System.Enum.GetValues(typeof(Ease));
 
             EditorGUILayout.LabelField("Easing Curves", EditorStyles.boldLabel);
             EditorGUI.BeginChangeCheck();

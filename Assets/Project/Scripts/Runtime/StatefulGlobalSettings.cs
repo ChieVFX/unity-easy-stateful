@@ -13,13 +13,18 @@ namespace EasyStateful.Runtime {
         public const string GlobalSettingsPathConstant = "StatefulGlobalSettings"; // Updated constant
         private static StatefulGlobalSettingsData _data;
 
-        public static StatefulGlobalSettingsData Instance
+        public static StatefulGlobalSettingsData Data
         {
             get
             {
                 if (_data == null)
                 {
-                    LoadData();
+                    _data = Resources.Load<StatefulGlobalSettingsData>("StatefulGlobalSettings");
+                    if (_data == null)
+                    {
+                        Debug.LogWarning("StatefulGlobalSettings asset not found in Resources folder. Using default values.");
+                        _data = ScriptableObject.CreateInstance<StatefulGlobalSettingsData>();
+                    }
                 }
                 return _data;
             }
@@ -70,25 +75,26 @@ namespace EasyStateful.Runtime {
         }
     #endif
 
-        public static float DefaultTime => Instance?.defaultTransitionTime ?? 0.5f;
-        public static Ease DefaultEase => Instance?.defaultEase ?? Ease.Linear;
-        public static List<PropertyOverrideRule> PropertyOverrides => Instance?.propertyOverrides ?? new List<PropertyOverrideRule>();
-        public static string DefaultBinarySavePath => Instance?.defaultBinarySavePath ?? "";
-        public static string DefaultAnimationSavePath => Instance?.defaultAnimationSavePath ?? "";
+        public static float DefaultTime => Data.defaultTransitionTime;
+        public static Ease DefaultEase => Data.defaultEase;
+        public static StatefulEasingsData EasingsData => Data.easingsData;
+        public static List<PropertyOverrideRule> PropertyOverrides => Data.propertyOverrides ?? new List<PropertyOverrideRule>();
+        public static string DefaultBinarySavePath => Data.defaultBinarySavePath ?? "";
+        public static string DefaultAnimationSavePath => Data.defaultAnimationSavePath ?? "";
 
         // This method now specifically gets rules from the GLOBAL settings.
         public static PropertyOverrideRule GetGlobalPropertyOverrideRule(string propertyName, string componentTypeFullName)
         {
-            if (Instance == null || Instance.propertyOverrides == null) return null;
+            if (Data == null || Data.propertyOverrides == null) return null;
 
-            var specificRule = Instance.propertyOverrides.FirstOrDefault(r =>
+            var specificRule = Data.propertyOverrides.FirstOrDefault(r =>
                 r.propertyName == propertyName &&
                 !string.IsNullOrEmpty(r.componentType) &&
                 r.componentType == componentTypeFullName);
 
             if (specificRule != null) return specificRule;
 
-            var generalRule = Instance.propertyOverrides.FirstOrDefault(r =>
+            var generalRule = Data.propertyOverrides.FirstOrDefault(r =>
                 r.propertyName == propertyName &&
                 string.IsNullOrEmpty(r.componentType));
 

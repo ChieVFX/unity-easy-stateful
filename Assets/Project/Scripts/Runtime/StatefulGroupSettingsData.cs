@@ -1,5 +1,4 @@
 using UnityEngine;
-using DG.Tweening;
 using System.Collections.Generic;
 
 namespace EasyStateful.Runtime {

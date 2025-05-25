@@ -2,9 +2,10 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using DG.Tweening;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -44,11 +45,7 @@ namespace EasyStateful.Runtime {
         
         // Pooled collections for TweenToState to reduce GC
         private List<Property> _pooledPropertiesToSnap = new List<Property>();
-        // For _pooledPropertiesToTweenGrouped, we'll start by clearing its internal lists if they exist,
-        // and the dictionary itself. Full pooling of inner lists is more complex and can be a later step if needed.
-        private Dictionary<Ease, List<(Property prop, PropertyBinding binding, float initialValue)>> _pooledPropertiesToTweenGrouped =
-            new Dictionary<Ease, List<(Property, PropertyBinding, float)>>();
-
+        
         // Add at class level:
         private static Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
 
@@ -66,6 +63,9 @@ namespace EasyStateful.Runtime {
         private Dictionary<Property, PropertyTransitionInfo> _propertyTransitionCache = new();
 
         private static Dictionary<(Type, string), MemberInfo> _memberInfoCache = new();
+
+        // UniTask cancellation
+        private CancellationTokenSource _currentTweenCancellation;
 
         [Serializable]
         private class PropertyBinding
@@ -157,6 +157,50 @@ namespace EasyStateful.Runtime {
             return StatefulGlobalSettings.GetGlobalPropertyOverrideRule(propertyName, componentTypeFullName);
         }
 
+        /// <summary>
+        /// Gets the effective easings data with proper fallback hierarchy
+        /// </summary>
+        private StatefulEasingsData GetEffectiveEasingsData()
+        {
+            // Tier 1: Group Settings
+            if (groupSettings != null && groupSettings.easingsData != null)
+                return groupSettings.easingsData;
+            
+            // Tier 2: Global Settings
+            if (StatefulGlobalSettings.EasingsData != null)
+                return StatefulGlobalSettings.EasingsData;
+            
+            // Fallback: Create default curves on demand
+            return null;
+        }
+
+        /// <summary>
+        /// Sample an easing curve at the given time (0-1)
+        /// </summary>
+        private float SampleEasing(Ease ease, float time)
+        {
+            return SampleEasing((int)ease, time);
+        }
+
+        /// <summary>
+        /// Sample an easing curve at the given time (0-1) using curve index
+        /// </summary>
+        private float SampleEasing(int easeIndex, float time)
+        {
+            var easingsData = GetEffectiveEasingsData();
+            
+            if (easingsData != null && easingsData.curves != null && 
+                easeIndex >= 0 && easeIndex < easingsData.curves.Length && 
+                easingsData.curves[easeIndex] != null)
+            {
+                return easingsData.curves[easeIndex].Evaluate(time);
+            }
+            
+            // Fallback to default curve generation
+            var defaultCurve = StatefulEasingsData.GetDefaultCurve((Ease)easeIndex);
+            return defaultCurve.Evaluate(time);
+        }
+
         void Awake()
         {
             if (statefulDataAsset != null)
@@ -170,6 +214,13 @@ namespace EasyStateful.Runtime {
             }
             BuildPropertyOverrideCache();
             BuildPropertyTransitionCache();
+        }
+
+        void OnDestroy()
+        {
+            // Cancel any running tweens
+            _currentTweenCancellation?.Cancel();
+            _currentTweenCancellation?.Dispose();
         }
 
         /// <summary>
@@ -218,10 +269,10 @@ namespace EasyStateful.Runtime {
         }
 
         /// <summary>
-        /// Tween all numeric properties in the given state over time.
+        /// Tween all numeric properties in the given state over time using UniTask.
         /// Object references will snap instantly.
         /// </summary>
-        public void TweenToState(string stateName, float? duration = null, Ease? ease = null)
+        public async UniTask TaskTweenToState(string stateName, float? duration = null, Ease? ease = null, CancellationToken cancellationToken = default)
         {
 #if UNITY_EDITOR
             if (!Application.isPlaying)
@@ -237,7 +288,17 @@ namespace EasyStateful.Runtime {
                 return;
             }
             
-            DOTween.Kill(this, true); 
+            // Cancel any existing tween
+            _currentTweenCancellation?.Cancel();
+            _currentTweenCancellation?.Dispose();
+            _currentTweenCancellation = new CancellationTokenSource();
+            
+            // Combine cancellation tokens
+            var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, 
+                _currentTweenCancellation.Token,
+                this.GetCancellationTokenOnDestroy()
+            ).Token;
             
             var state = stateMachine.states.Find(s => s.name == stateName);
             if (state == null)
@@ -256,31 +317,18 @@ namespace EasyStateful.Runtime {
             #endif
 
             List<Property> propertiesToSnap;
-            Dictionary<Ease, List<(Property prop, PropertyBinding binding, float initialValue)>> propertiesToTweenGrouped;
+            List<(Property prop, PropertyBinding binding, float initialValue, Ease ease)> propertiesToTween;
 
             if (usePooling)
             {
                 _pooledPropertiesToSnap.Clear();
                 propertiesToSnap = _pooledPropertiesToSnap;
-
-                // Change pooled dictionary type if needed
-                if (_pooledPropertiesToTweenGrouped is Dictionary<Ease, List<(Property, PropertyBinding, float)>> pooledByEase)
-                {
-                    foreach (var list in pooledByEase.Values)
-                        list.Clear();
-                    pooledByEase.Clear();
-                    propertiesToTweenGrouped = pooledByEase;
-                }
-                else
-                {
-                    propertiesToTweenGrouped = new Dictionary<Ease, List<(Property, PropertyBinding, float)>>();
-                    _pooledPropertiesToTweenGrouped = (Dictionary<Ease, List<(Property, PropertyBinding, float)>>)(object)propertiesToTweenGrouped;
-                }
+                propertiesToTween = new List<(Property, PropertyBinding, float, Ease)>();
             }
             else
             {
                 propertiesToSnap = new List<Property>();
-                propertiesToTweenGrouped = new Dictionary<Ease, List<(Property, PropertyBinding, float)>>();
+                propertiesToTween = new List<(Property, PropertyBinding, float, Ease)>();
             }
 
             foreach (var prop in state.properties)
@@ -384,12 +432,7 @@ namespace EasyStateful.Runtime {
                 else if (binding.setter != null && binding.component != null && binding.getter != null) // Numeric, tweenable property
                 {
                     float initialValue = GetCurrentValue(binding);
-                    var key = finalPropEase;
-                    if (!propertiesToTweenGrouped.ContainsKey(key))
-                    {
-                        propertiesToTweenGrouped[key] = new List<(Property prop, PropertyBinding binding, float initialValue)>();
-                    }
-                    propertiesToTweenGrouped[key].Add((prop, binding, initialValue));
+                    propertiesToTween.Add((prop, binding, initialValue, finalPropEase));
                 }
                 else
                 {
@@ -403,41 +446,116 @@ namespace EasyStateful.Runtime {
                 ApplyProperty(propToSnap);
             }
 
-            // Create grouped tweens
-            foreach (var kvp in propertiesToTweenGrouped)
+            // If no properties to tween, we're done
+            if (propertiesToTween.Count == 0)
+                return;
+
+            // Start the unified tween using UniTask
+            try
             {
-                var groupEase = kvp.Key;
-                var propsInGroup = kvp.Value;
-
-                if (propsInGroup.Count == 0) continue;
-
-                // Use the same duration for all groups (from root/group/global)
-                DOVirtual.Float(0f, 1f, overallDuration, progress =>
-                {
-                    foreach (var item in propsInGroup)
-                    {
-                        float interpolatedValue = Mathf.LerpUnclamped(item.initialValue, item.prop.value, progress);
-                        if (item.binding.component != null)
-                        {
-                            item.binding.setter(item.binding.component, interpolatedValue);
-#if UNITY_EDITOR
-                            if (!Application.isPlaying && GUI.changed) // Only in Editor and not Play Mode
-                            {
-                                // Mark the specific component whose property was changed as dirty.
-                                // This encourages the editor to repaint views that display this component's state.
-                                EditorUtility.SetDirty(item.binding.component);
-                            }
-#endif
-                        }
-                    }
-                })
-                .SetEase(groupEase)
-                .SetTarget(this)
-#if UNITY_EDITOR
-                .SetUpdate(Application.isPlaying ? UpdateType.Normal : UpdateType.Manual)
-#endif
-                ;
+                await TweenPropertiesAsync(propertiesToTween, overallDuration, combinedToken);
             }
+            catch (OperationCanceledException)
+            {
+                // Tween was cancelled, this is expected behavior
+            }
+            finally
+            {
+                _currentTweenCancellation?.Dispose();
+                _currentTweenCancellation = null;
+            }
+        }
+
+        /// <summary>
+        /// Unified tweening method using UniTask that handles all properties with different easings
+        /// </summary>
+        private async UniTask TweenPropertiesAsync(
+            List<(Property prop, PropertyBinding binding, float initialValue, Ease ease)> propertiesToTween,
+            float duration,
+            CancellationToken cancellationToken)
+        {
+            if (duration <= 0f)
+            {
+                // Apply final values immediately
+                foreach (var item in propertiesToTween)
+                {
+                    if (item.binding.component != null)
+                    {
+                        item.binding.setter(item.binding.component, item.prop.value);
+#if UNITY_EDITOR
+                        if (!Application.isPlaying && GUI.changed)
+                        {
+                            EditorUtility.SetDirty(item.binding.component);
+                        }
+#endif
+                    }
+                }
+                return;
+            }
+
+            float elapsedTime = 0f;
+            
+            while (elapsedTime < duration)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                
+                float normalizedTime = Mathf.Clamp01(elapsedTime / duration);
+                
+                // Update all properties with their respective easings
+                foreach (var item in propertiesToTween)
+                {
+                    if (item.binding.component != null)
+                    {
+                        float easedProgress = SampleEasing(item.ease, normalizedTime);
+                        float interpolatedValue = Mathf.LerpUnclamped(item.initialValue, item.prop.value, easedProgress);
+                        item.binding.setter(item.binding.component, interpolatedValue);
+                        
+#if UNITY_EDITOR
+                        if (!Application.isPlaying && GUI.changed)
+                        {
+                            EditorUtility.SetDirty(item.binding.component);
+                        }
+#endif
+                    }
+                }
+                
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    // In editor, use unscaled time
+                    elapsedTime += Time.unscaledDeltaTime;
+                    await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+                }
+                else
+#endif
+                {
+                    elapsedTime += Time.deltaTime;
+                    await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+                }
+            }
+            
+            // Ensure final values are set
+            foreach (var item in propertiesToTween)
+            {
+                if (item.binding.component != null)
+                {
+                    item.binding.setter(item.binding.component, item.prop.value);
+#if UNITY_EDITOR
+                    if (!Application.isPlaying && GUI.changed)
+                    {
+                        EditorUtility.SetDirty(item.binding.component);
+                    }
+#endif
+                }
+            }
+        }
+
+        /// <summary>
+        /// Convenience method for non-async calls (maintains backward compatibility)
+        /// </summary>
+        public void TweenToState(string stateName, float? duration = null, Ease? ease = null)
+        {
+            TaskTweenToState(stateName, duration, ease, CancellationToken.None).Forget();
         }
 
         private void ApplyProperty(Property prop)

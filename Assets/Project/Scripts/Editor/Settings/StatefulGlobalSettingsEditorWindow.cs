@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEditor;
-using DG.Tweening;
 using System.Collections.Generic;
 using System.IO;
 using EasyStateful.Runtime;
@@ -12,6 +11,7 @@ namespace EasyStateful.Editor {
         private SerializedObject serializedSettings;
         private SerializedProperty defaultTimeProp;
         private SerializedProperty defaultEaseProp;
+        private SerializedProperty easingsDataProp;
         private SerializedProperty overridesProp;
         private SerializedProperty defaultBinarySavePathProp;
         private SerializedProperty defaultAnimationSavePathProp;
@@ -33,7 +33,7 @@ namespace EasyStateful.Editor {
     #if UNITY_EDITOR
             StatefulGlobalSettings.ClearCachedInstance(); 
     #endif
-            settingsData = StatefulGlobalSettings.Instance; 
+            settingsData = StatefulGlobalSettings.Data; 
 
             if (settingsData == null) 
             {
@@ -67,7 +67,7 @@ namespace EasyStateful.Editor {
     #if UNITY_EDITOR
                 StatefulGlobalSettings.ClearCachedInstance(); 
     #endif
-                settingsData = StatefulGlobalSettings.Instance; 
+                settingsData = StatefulGlobalSettings.Data; 
             }
             
             if (settingsData != null)
@@ -75,6 +75,7 @@ namespace EasyStateful.Editor {
                 serializedSettings = new SerializedObject(settingsData);
                 defaultTimeProp = serializedSettings.FindProperty("defaultTransitionTime");
                 defaultEaseProp = serializedSettings.FindProperty("defaultEase");
+                easingsDataProp = serializedSettings.FindProperty("easingsData");
                 overridesProp = serializedSettings.FindProperty("propertyOverrides");
                 defaultBinarySavePathProp = serializedSettings.FindProperty("defaultBinarySavePath");
                 defaultAnimationSavePathProp = serializedSettings.FindProperty("defaultAnimationSavePath");
@@ -100,6 +101,8 @@ namespace EasyStateful.Editor {
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
             serializedSettings.Update();
+
+            EditorGUILayout.PropertyField(easingsDataProp, new GUIContent("Easings Data"));
 
             EditorGUILayout.LabelField("Global Default Transition Settings", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(defaultTimeProp, new GUIContent("Default Time"));

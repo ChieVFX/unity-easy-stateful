@@ -4,7 +4,7 @@ namespace EasyStateful.Runtime {
     [CreateAssetMenu(fileName = "StatefulEasingsData", menuName = "Stateful UI/Easings Data", order = 10)]
     public class StatefulEasingsData : ScriptableObject
     {
-        public AnimationCurve[] curves = new AnimationCurve[System.Enum.GetValues(typeof(Stateful.Runtime.Ease)).Length];
+        public AnimationCurve[] curves = new AnimationCurve[System.Enum.GetValues(typeof(Ease)).Length];
 
         private const float PI = Mathf.PI;
         private const float BIG_TANGENT = 100f; // Used for "infinite" or very large derivatives
@@ -25,10 +25,10 @@ namespace EasyStateful.Runtime {
 
         private void OnValidate()
         {
-            if (curves == null || curves.Length != System.Enum.GetValues(typeof(Stateful.Runtime.Ease)).Length)
+            if (curves == null || curves.Length != System.Enum.GetValues(typeof(Ease)).Length)
             {
                 var old = curves;
-                curves = new AnimationCurve[System.Enum.GetValues(typeof(Stateful.Runtime.Ease)).Length];
+                curves = new AnimationCurve[System.Enum.GetValues(typeof(Ease)).Length];
                 if (old != null)
                 {
                     for (int i = 0; i < Mathf.Min(old.Length, curves.Length); i++)
@@ -41,7 +41,7 @@ namespace EasyStateful.Runtime {
         {
             for (int i = 0; i < curves.Length; i++)
             {
-                curves[i] = GetDefaultCurve((Stateful.Runtime.Ease)i);
+                curves[i] = GetDefaultCurve((Ease)i);
             }
         }
 
@@ -344,7 +344,7 @@ namespace EasyStateful.Runtime {
             return unique_times.ToArray();
         }
 
-        public static AnimationCurve GetDefaultCurve(Stateful.Runtime.Ease ease)
+        public static AnimationCurve GetDefaultCurve(Ease ease)
         {
             // Local static functions for derivative calculations
             static float CalculateInCirc_Val(float x) {
@@ -399,23 +399,23 @@ namespace EasyStateful.Runtime {
 
             switch (ease)
             {
-                case Stateful.Runtime.Ease.Linear:
+                case Ease.Linear:
                     return AnimationCurve.Linear(0, 0, 1, 1);
-                case Stateful.Runtime.Ease.InSine:
+                case Ease.InSine:
                     // y = 1 - cos((x * PI) / 2)
                     // dy/dx = sin((x*PI)/2) * PI/2
                     return new AnimationCurve(
                         new Keyframe(0, 0, 0, 0), // x=0: dy/dx=0
                         new Keyframe(1, 1, PI / 2f, 0) // x=1: dy/dx=PI/2
                     );
-                case Stateful.Runtime.Ease.OutSine:
+                case Ease.OutSine:
                     // y = sin((x * PI) / 2)
                     // dy/dx = cos((x*PI)/2) * PI/2
                     return new AnimationCurve(
                         new Keyframe(0, 0, 0, PI / 2f), // x=0: dy/dx=PI/2
                         new Keyframe(1, 1, 0, 0)    // x=1: dy/dx=0
                     );
-                case Stateful.Runtime.Ease.InOutSine:
+                case Ease.InOutSine:
                     // y = 0.5 * (1 - cos(PI * x))
                     // dy/dx = 0.5 * sin(PI * x) * PI
                     return new AnimationCurve(
@@ -423,45 +423,45 @@ namespace EasyStateful.Runtime {
                         new Keyframe(0.5f, 0.5f, PI / 2f, PI / 2f), // x=0.5: dy/dx=PI/2
                         new Keyframe(1f, 1f, 0f, 0f)  // x=1: dy/dx=0
                     );
-                case Stateful.Runtime.Ease.InQuad:
+                case Ease.InQuad:
                     // y = x^2
                     return new AnimationCurve(
                         new Keyframe(0, 0, 0, 0),
                         new Keyframe(1, 1, 2, 0)
                     );
-                case Stateful.Runtime.Ease.OutQuad:
+                case Ease.OutQuad:
                     // y = 1 - (1 - x)^2
                     return new AnimationCurve(
                         new Keyframe(0, 0, 0, 2),
                         new Keyframe(1, 1, 0, 0)
                     );
-                case Stateful.Runtime.Ease.InOutQuad:
+                case Ease.InOutQuad:
                     // y = 2x^2 (x<0.5), 1-2(1-x)^2 (x>=0.5)
                     return new AnimationCurve(
                         new Keyframe(0, 0, 0, 0),
                         new Keyframe(0.5f, 0.5f, 2, 2),
                         new Keyframe(1, 1, 0, 0)
                     );
-                case Stateful.Runtime.Ease.InCubic:
+                case Ease.InCubic:
                     // y = x^3
                     return new AnimationCurve(
                         new Keyframe(0, 0, 0, 0),
                         new Keyframe(1, 1, 3, 0)
                     );
-                case Stateful.Runtime.Ease.OutCubic:
+                case Ease.OutCubic:
                     // y = 1 - (1-x)^3
                     return new AnimationCurve(
                         new Keyframe(0, 0, 0, 3),
                         new Keyframe(1, 1, 0, 0)
                     );
-                case Stateful.Runtime.Ease.InOutCubic:
+                case Ease.InOutCubic:
                     // y = 4x^3 (x<0.5), 1-4(1-x)^3 (x>=0.5)
                     return new AnimationCurve(
                         new Keyframe(0, 0, 0, 0),
                         new Keyframe(0.5f, 0.5f, 3, 3),
                         new Keyframe(1, 1, 0, 0)
                     );
-                case Stateful.Runtime.Ease.InQuart:
+                case Ease.InQuart:
                     // y = x^4, dy/dx = 4x^3
                     return new AnimationCurve(
                         new Keyframe(0f, 0f, 0f, 0f),
@@ -470,7 +470,7 @@ namespace EasyStateful.Runtime {
                         new Keyframe(0.75f, Mathf.Pow(0.75f, 4), 4 * Mathf.Pow(0.75f, 3), 4 * Mathf.Pow(0.75f, 3)),
                         new Keyframe(1f, 1f, 4f, 4f)
                     );
-                case Stateful.Runtime.Ease.OutQuart:
+                case Ease.OutQuart:
                     // y = 1 - (1-x)^4, dy/dx = 4(1-x)^3
                     return new AnimationCurve(
                         new Keyframe(0f, 0f, 4f, 4f),
@@ -479,7 +479,7 @@ namespace EasyStateful.Runtime {
                         new Keyframe(0.75f, 1f - Mathf.Pow(1f - 0.75f, 4), 4 * Mathf.Pow(1f - 0.75f, 3), 4 * Mathf.Pow(1f - 0.75f, 3)),
                         new Keyframe(1f, 1f, 0f, 0f)
                     );
-                case Stateful.Runtime.Ease.InOutQuart:
+                case Ease.InOutQuart:
                     // y = 8x^4 (x<0.5), 1-8(1-x)^4 (x>=0.5)
                     // dy/dx = 32x^3 (x<0.5), 32(1-x)^3 (x>=0.5)
                     return new AnimationCurve(
@@ -489,7 +489,7 @@ namespace EasyStateful.Runtime {
                         new Keyframe(0.75f, 1f - 8f * Mathf.Pow(1f - 0.75f, 4), 32f * Mathf.Pow(1f - 0.75f, 3), 32f * Mathf.Pow(1f - 0.75f, 3)),
                         new Keyframe(1f, 1f, 0f, 0f)
                     );
-                case Stateful.Runtime.Ease.InQuint:
+                case Ease.InQuint:
                     // y = x^5, dy/dx = 5x^4
                     return new AnimationCurve(
                         new Keyframe(0f, 0f, 0f, 0f),
@@ -498,7 +498,7 @@ namespace EasyStateful.Runtime {
                         new Keyframe(0.75f, Mathf.Pow(0.75f, 5), 5 * Mathf.Pow(0.75f, 4), 5 * Mathf.Pow(0.75f, 4)),
                         new Keyframe(1f, 1f, 5f, 5f)
                     );
-                case Stateful.Runtime.Ease.OutQuint:
+                case Ease.OutQuint:
                     // y = 1 - (1-x)^5, dy/dx = 5(1-x)^4
                     return new AnimationCurve(
                         new Keyframe(0f, 0f, 5f, 5f),
@@ -507,7 +507,7 @@ namespace EasyStateful.Runtime {
                         new Keyframe(0.75f, 1f - Mathf.Pow(1f - 0.75f, 5), 5 * Mathf.Pow(1f - 0.75f, 4), 5 * Mathf.Pow(1f - 0.75f, 4)),
                         new Keyframe(1f, 1f, 0f, 0f)
                     );
-                case Stateful.Runtime.Ease.InOutQuint:
+                case Ease.InOutQuint:
                     // y = 16x^5 (x<0.5), 1-16(1-x)^5 (x>=0.5)
                     // dy/dx = 80x^4 (x<0.5), 80(1-x)^4 (x>=0.5)
                     return new AnimationCurve(
@@ -517,7 +517,7 @@ namespace EasyStateful.Runtime {
                         new Keyframe(0.75f, 1f - 16f * Mathf.Pow(1f - 0.75f, 5), 80f * Mathf.Pow(1f - 0.75f, 4), 80f * Mathf.Pow(1f - 0.75f, 4)),
                         new Keyframe(1f, 1f, 0f, 0f)
                     );
-                case Stateful.Runtime.Ease.InExpo:
+                case Ease.InExpo:
                     float[] inExpoTimes = {0f, 0.1f, 0.25f, 0.5f, 0.75f, 0.9f, 1f};
                      // For InExpo, deriv at 0 is 0, deriv at 1 is large
                     Keyframe[] inExpoKeys = CreateKeyframes(
@@ -526,7 +526,7 @@ namespace EasyStateful.Runtime {
                         x => (x == 0f) ? 0f : 10f * Mathf.Log(2f) * Mathf.Pow(2f, 10f * (x-1f)),
                         inExpoTimes, forceFlatStart: true, forceFlatEnd: false);
                     return new AnimationCurve(inExpoKeys);
-                case Stateful.Runtime.Ease.OutExpo:
+                case Ease.OutExpo:
                     float[] outExpoTimes = {0f, 0.1f, 0.25f, 0.5f, 0.75f, 0.9f, 1f};
                     // For OutExpo, deriv at 0 is large, deriv at 1 is 0
                     Keyframe[] outExpoKeys = CreateKeyframes(
@@ -535,7 +535,7 @@ namespace EasyStateful.Runtime {
                         x => (x == 1f) ? 0f : 10f * Mathf.Log(2f) * Mathf.Pow(2f, -10f * x),
                         outExpoTimes, forceFlatStart: false, forceFlatEnd: true);
                     return new AnimationCurve(outExpoKeys);
-                case Stateful.Runtime.Ease.InOutExpo:
+                case Ease.InOutExpo:
                     // y = x<0.5 ? 0.5 * 2^(20x-10) : 1-0.5*2^(-20x+10)
                     // dy/dx = x<0.5 ? 10*ln2*2^(20x-10) : 10*ln2*2^(-20x+10)
                     // Deriv at 0 is 0, at 0.5 is 10*ln2, at 1 is 0.
@@ -553,50 +553,50 @@ namespace EasyStateful.Runtime {
                     float[] inOutExpoTimes = {0f, 0.05f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 0.95f, 1f};
                     Keyframe[] inOutExpoKeys = CreateKeyframes(inOutExpoVal, inOutExpoDeriv, inOutExpoDeriv, inOutExpoTimes, forceFlatStart: true, forceFlatEnd: true);
                     return new AnimationCurve(inOutExpoKeys);
-                case Stateful.Runtime.Ease.InCirc:
+                case Ease.InCirc:
                     {
                         float[] times = {0f, 0.25f, 0.5f, 0.75f, 0.9f, 0.95f, 0.99f, 1f};
                         Keyframe[] keys = CreateKeyframes(CalculateInCirc_Val, CalculateInCirc_Deriv, CalculateInCirc_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.OutCirc:
+                case Ease.OutCirc:
                      {
                         float[] times = {0f, 0.01f, 0.05f, 0.1f, 0.25f, 0.5f, 0.75f, 1f};
                         Keyframe[] keys = CreateKeyframes(CalculateOutCirc_Val, CalculateOutCirc_Deriv, CalculateOutCirc_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.InOutCirc:
+                case Ease.InOutCirc:
                     {
                         float[] times = {0f, 0.1f, 0.25f, 0.4f, 0.45f, 0.49f, 0.5f, 0.51f, 0.55f, 0.6f, 0.75f, 0.9f, 1f};
                         Keyframe[] keys = CreateKeyframes(CalculateInOutCirc_Val, CalculateInOutCirc_Deriv, CalculateInOutCirc_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.InElastic:
+                case Ease.InElastic:
                     {
                         float[] times = {0f, 0.05f, 0.15f, .3f, .45f, 0.6f, 0.7f, 0.775f, 0.85f, 0.925f, 0.97f, 1f};
                         Keyframe[] keys = CreateKeyframes(CalculateInElastic_Val, CalculateInElastic_Deriv, CalculateInElastic_Deriv, times, true);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.OutElastic:
+                case Ease.OutElastic:
                     {
                         float[] times = {0f, 0.03f, 0.075f, 0.15f, 0.225f, 0.3f, 0.4f, .55f, .7f, 0.85f, 0.95f, 1f};
                         Keyframe[] keys = CreateKeyframes(CalculateOutElastic_Val, CalculateOutElastic_Deriv, CalculateOutElastic_Deriv, times, true);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.InOutElastic:
+                case Ease.InOutElastic:
                     {
                         float[] times = {0f, 0.05f, 0.15f, 0.25f, 0.35f, 0.44375f, 0.5f, 0.55625f, 0.65f, 0.75f, 0.85f, 0.95f, 1f};
                         Keyframe[] keys = CreateKeyframes(CalculateInOutElastic_Val, CalculateInOutElastic_Deriv, CalculateInOutElastic_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.InBack:
+                case Ease.InBack:
                     {
                         float overshootTime = (2f * BACK_C1) / (3f * BACK_C3); // approx 0.4199f
                         float[] times = {0f, 0.1f, overshootTime, overshootTime + (1f - overshootTime) * 0.5f, 1f}; 
                         Keyframe[] keys = CreateKeyframes(CalculateInBack_Val, CalculateInBack_Deriv, CalculateInBack_Deriv, times, true, false);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.OutBack:
+                case Ease.OutBack:
                     {
                         float overshootCalc = (2f * BACK_C1) / (3f * BACK_C3);
                         float overshootTime = 1f - overshootCalc; // approx 0.5801f
@@ -604,7 +604,7 @@ namespace EasyStateful.Runtime {
                         Keyframe[] keys = CreateKeyframes(CalculateOutBack_Val, CalculateOutBack_Deriv, CalculateOutBack_Deriv, times, false, true);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.InOutBack:
+                case Ease.InOutBack:
                     {
                         float overshoot1Time = BACK_C2 / (3f * BACK_C4); 
                         float actualOvershoot1Time = overshoot1Time * 0.5f; 
@@ -614,7 +614,7 @@ namespace EasyStateful.Runtime {
                         Keyframe[] keys = CreateKeyframes(CalculateInOutBack_Val, CalculateInOutBack_Deriv, CalculateInOutBack_Deriv, times, true, true);
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.InBounce:
+                case Ease.InBounce:
                     {
                         float[] p_out_crit_times = {
                             0f, 1f/BOUNCE_D1, 1.5f/BOUNCE_D1, 2f/BOUNCE_D1, 
@@ -662,7 +662,7 @@ namespace EasyStateful.Runtime {
                         
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.OutBounce:
+                case Ease.OutBounce:
                     {
                         System.Collections.Generic.List<float> times_list = new System.Collections.Generic.List<float> {
                             0f, 1f/BOUNCE_D1, 1.5f/BOUNCE_D1, 2f/BOUNCE_D1, 
@@ -699,7 +699,7 @@ namespace EasyStateful.Runtime {
                         
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.InOutBounce:
+                case Ease.InOutBounce:
                     {
                         float[] p_out_crit_times = { 
                             0f, 1f/BOUNCE_D1, 1.5f/BOUNCE_D1, 2f/BOUNCE_D1, 
@@ -785,7 +785,7 @@ namespace EasyStateful.Runtime {
                         
                         return new AnimationCurve(keys);
                     }
-                case Stateful.Runtime.Ease.Flash:
+                case Ease.Flash:
                     // Changes instantly midway (0 for x<0.5, 1 for x>=0.5)
                     return new AnimationCurve(
                         new Keyframe(0f, 0f, 0f, 0f),
@@ -793,13 +793,13 @@ namespace EasyStateful.Runtime {
                         new Keyframe(0.5f, 1f, 0f, 0f),
                         new Keyframe(1f, 1f, 0f, 0f)
                     );
-                case Stateful.Runtime.Ease.InFlash:
+                case Ease.InFlash:
                     // Always 1
                     return new AnimationCurve(
                         new Keyframe(0f, 1f, 0f, 0f),
                         new Keyframe(1f, 1f, 0f, 0f)
                     );
-                case Stateful.Runtime.Ease.OutFlash:
+                case Ease.OutFlash:
                     // 0, but jumps to 1 at end
                     return new AnimationCurve(
                         new Keyframe(0f, 0f, 0f, 0f),
