@@ -554,6 +554,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -788,6 +789,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -943,6 +945,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -2670,6 +2673,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -2863,6 +2867,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -3318,6 +3323,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -3398,6 +3404,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -3478,6 +3485,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -4690,6 +4698,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -5825,6 +5834,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -6205,6 +6215,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -7040,6 +7051,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -7120,6 +7132,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -7275,6 +7288,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -9806,6 +9820,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -9886,6 +9901,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -10156,6 +10172,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -10236,6 +10253,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -10729,6 +10747,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -11299,6 +11318,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -11379,6 +11399,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -11459,6 +11480,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -11614,6 +11636,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -12757,6 +12780,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -12875,6 +12899,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -12955,6 +12980,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -13298,6 +13324,7 @@ MonoBehaviour:
   - Initial
   - Red
   - Hide
+  - Green
   currentStateIndex: 0
   overrideDefaultTransitionTime: 0
   customDefaultTransitionTime: 0.5
@@ -13364,6 +13391,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 93415869722450910, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
+      propertyPath: m_Name
+      value: Image_first
+      objectReference: {fileID: 0}
     - target: {fileID: 93415869722450910, guid: 22490e50e0b53fa449586f3e0018446b, type: 3}
       propertyPath: m_IsActive
       value: 1

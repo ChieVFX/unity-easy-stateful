@@ -14,12 +14,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   overrideGlobalDefaultTransitionTime: 0
   customDefaultTransitionTime: 5
-  overrideGlobalDefaultEase: 0
-  customDefaultEase: 7
+  overrideGlobalDefaultEase: 1
+  customDefaultEase: 17
   propertyOverrides:
+  - propertyName: m_IsActive
+    componentType: 
+    pathWildcard: 
+    overrideEase: 0
+    ease: 1
+    instantEnableDelayedDisable: 1
   - propertyName: 
     componentType: 
     pathWildcard: '*_first*'
     overrideEase: 1
-    ease: 1
+    ease: 20
     instantEnableDelayedDisable: 0
