@@ -1,0 +1,502 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cefcc61c5dace6e4fac314dda8237567, type: 3}
+  m_Name: Expert
+  m_EditorClassIdentifier: 
+  stateMachine:
+    states:
+    - name: Default
+      time: 0
+      properties:
+      - path: 
+        componentType: UnityEngine.CanvasGroup, UnityEngine.UIModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_Alpha
+        value: 1
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 100
+        objectReference: 
+      - path: Lines/Line (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Lines/Line (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Lines/Line (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Lines/Line (3)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: Lines/Line (3)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Lines/Line (3)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 1
+        objectReference: 
+      - path: Lines/Line (3)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: Lines/Line (3)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Lines/Line (3)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 1
+        objectReference: 
+      - path: Lines/Line (2)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: Lines/Line (2)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Lines/Line (2)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 1
+        objectReference: 
+      - path: Lines/Line (2)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: Lines/Line (2)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Lines/Line (2)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 1
+        objectReference: 
+      - path: Lines/Line (1)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: Lines/Line (1)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Lines/Line (1)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 1
+        objectReference: 
+      - path: Lines/Line (1)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: Lines/Line (1)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Lines/Line (1)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 1
+        objectReference: 
+      - path: Lines/Line (3)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Lines/Line (3)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Lines/Line (2)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Lines/Line (2)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Lines/Line (1)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Lines/Line (1)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_IsActive
+        value: 1
+        objectReference: 
+      - path: Lines
+        componentType: UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_IsActive
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_AnchoredPosition.x
+        value: 50
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_LocalScale.x
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_LocalScale.y
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_LocalScale.z
+        value: 1
+        objectReference: 
+    - name: Hidden
+      time: 0.016666668
+      properties:
+      - path: 
+        componentType: UnityEngine.CanvasGroup, UnityEngine.UIModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_Alpha
+        value: 0.67
+        objectReference: 
+      - path: 
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 50
+        objectReference: 
+      - path: Lines/Line (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 10
+        objectReference: 
+      - path: Lines/Line (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 10
+        objectReference: 
+      - path: Lines/Line (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 10
+        objectReference: 
+      - path: Lines/Line (3)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.11320752
+        objectReference: 
+      - path: Lines/Line (3)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (3)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (3)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.11320752
+        objectReference: 
+      - path: Lines/Line (3)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (3)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (2)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.11320752
+        objectReference: 
+      - path: Lines/Line (2)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (2)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (2)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.11320752
+        objectReference: 
+      - path: Lines/Line (2)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (2)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (1)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.11320752
+        objectReference: 
+      - path: Lines/Line (1)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (1)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (1)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.11320752
+        objectReference: 
+      - path: Lines/Line (1)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (1)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0.062477734
+        objectReference: 
+      - path: Lines/Line (3)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 0
+        objectReference: 
+      - path: Lines/Line (3)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 0
+        objectReference: 
+      - path: Lines/Line (2)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 0
+        objectReference: 
+      - path: Lines/Line (2)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 0
+        objectReference: 
+      - path: Lines/Line (1)/MockupToggle
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 0
+        objectReference: 
+      - path: Lines/Line (1)/MockupText
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 0
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.24528301
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 0.14231043
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0.14231043
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 0
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_IsActive
+        value: 0
+        objectReference: 
+      - path: Lines
+        componentType: UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_IsActive
+        value: 0
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_AnchoredPosition.x
+        value: 50
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_LocalScale.x
+        value: 1
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_LocalScale.y
+        value: 0
+        objectReference: 
+      - path: Image (0)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_LocalScale.z
+        value: 1
+        objectReference: 

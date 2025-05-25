@@ -9,17 +9,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 27426f39549fbfc40817f6fa93332add, type: 3}
-  m_Name: StatefulGlobalSettings
+  m_Script: {fileID: 11500000, guid: 9ecbbaef50e2dc24e911a1055ca2adac, type: 3}
+  m_Name: OverrideGroupExpert
   m_EditorClassIdentifier: 
-  defaultTransitionTime: 0.5
-  defaultEase: 21
+  overrideGlobalDefaultTransitionTime: 0
+  customDefaultTransitionTime: 5
+  overrideGlobalDefaultEase: 0
+  customDefaultEase: 17
   propertyOverrides:
   - propertyName: m_IsActive
     componentType: 
     pathWildcard: 
     overrideEase: 0
-    ease: 1
+    ease: 34
     instantEnableDelayedDisable: 1
     useCustomTiming: 0
     customTimingStart: 0
@@ -31,25 +33,52 @@ MonoBehaviour:
     ease: 1
     instantEnableDelayedDisable: 0
     useCustomTiming: 0
-    customTimingStart: 0
+    customTimingStart: 2
     customTimingEnd: 0
   - propertyName: m_Color.g
     componentType: 
     pathWildcard: 
     overrideEase: 1
-    ease: 1
+    ease: 18
     instantEnableDelayedDisable: 0
     useCustomTiming: 0
-    customTimingStart: 0
+    customTimingStart: 2
     customTimingEnd: 0
   - propertyName: m_Color.b
     componentType: 
     pathWildcard: 
     overrideEase: 1
-    ease: 1
+    ease: 18
     instantEnableDelayedDisable: 0
     useCustomTiming: 0
+    customTimingStart: 2
+    customTimingEnd: 0
+  - propertyName: 
+    componentType: 
+    pathWildcard: '*(1)*'
+    overrideEase: 0
+    ease: 9
+    instantEnableDelayedDisable: 0
+    useCustomTiming: 1
     customTimingStart: 0
+    customTimingEnd: 1
+  - propertyName: 
+    componentType: 
+    pathWildcard: '*(2)*'
+    overrideEase: 0
+    ease: 30
+    instantEnableDelayedDisable: 0
+    useCustomTiming: 1
+    customTimingStart: 0.5
+    customTimingEnd: 0.5
+  - propertyName: 
+    componentType: 
+    pathWildcard: '*(3)*'
+    overrideEase: 0
+    ease: 24
+    instantEnableDelayedDisable: 0
+    useCustomTiming: 1
+    customTimingStart: 1
     customTimingEnd: 0
   - propertyName: m_Color.a
     componentType: 
@@ -58,8 +87,14 @@ MonoBehaviour:
     ease: 1
     instantEnableDelayedDisable: 0
     useCustomTiming: 0
-    customTimingStart: 0
+    customTimingStart: 2
     customTimingEnd: 0
-  defaultBinarySavePath: StatefulData
-  defaultAnimationSavePath: Animations
-  easingsData: {fileID: 11400000, guid: 8cd264c0391311d41ac75178e2f97196, type: 2}
+  - propertyName: 
+    componentType: 
+    pathWildcard: '*(0)*'
+    overrideEase: 1
+    ease: 30
+    instantEnableDelayedDisable: 0
+    useCustomTiming: 1
+    customTimingStart: 0.5
+    customTimingEnd: 0.5

@@ -30,6 +30,9 @@ namespace EasyStateful.Runtime
         // UniTask cancellation
         private CancellationTokenSource _currentTweenCancellation;
 
+        // Add a field to track deactivation properties
+        private List<Property> _pooledPropertiesToDeactivate = new List<Property>();
+
         // Struct to avoid allocations in the tween loop
         private struct TweenItem
         {
@@ -73,6 +76,7 @@ namespace EasyStateful.Runtime
             // Clear pooled collections
             _pooledPropertiesToSnap.Clear();
             _pooledPropertiesToTween.Clear();
+            _pooledPropertiesToDeactivate.Clear();
 
             // Process properties
             ProcessProperties(targetState, duration, ease, bindingManager, settingsResolver, propertyTransitionCache);
@@ -83,15 +87,22 @@ namespace EasyStateful.Runtime
                 ApplyProperty(_pooledPropertiesToSnap[i], bindingManager);
             }
 
-            // If no properties to tween, we're done
+            // If no properties to tween, apply deactivations and we're done
             if (_pooledPropertiesToTween.Count == 0)
+            {
+                ApplyDeactivations(bindingManager);
                 return;
+            }
 
             PrepareArrayBasedTween();
 
             // Use a completion source that gets resolved in Update
             var completionSource = new UniTaskCompletionSource();
-            _tweenCompletionCallback = () => completionSource.TrySetResult();
+            _tweenCompletionCallback = () => 
+            {
+                ApplyDeactivations(bindingManager);
+                completionSource.TrySetResult();
+            };
             
             StartTween(duration);
             
@@ -123,40 +134,10 @@ namespace EasyStateful.Runtime
                     {
                         duration = duration,
                         ease = ease,
-                        instantEnableDelayedDisable = false,
                         useCustomTiming = false,
                         customTimingStart = 0f,
                         customTimingEnd = 0f
                     };
-                }
-
-                // Handle special rules
-                if (transitionInfo.instantEnableDelayedDisable && prop.propertyName == "m_IsActive")
-                {
-                    if (prop.value > 0.5f)
-                    {
-                        if (prop.objectReference != null)
-                        {
-                            var obj = Resources.Load(prop.objectReference);
-                            if (obj != null)
-                            {
-                                prop.objectReference = null;
-                                prop.value = 1f;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (prop.objectReference != null)
-                        {
-                            var obj = Resources.Load(prop.objectReference);
-                            if (obj != null)
-                            {
-                                prop.objectReference = null;
-                                prop.value = 0f;
-                            }
-                        }
-                    }
                 }
                 
                 // Get the binding for this property - this should use cached bindings
@@ -165,14 +146,29 @@ namespace EasyStateful.Runtime
                 if (binding == null)
                     continue;
 
+                // Special handling for m_IsActive - always immediate
+                if (prop.propertyName == "m_IsActive" && binding.targetGameObject != null)
+                {
+                    // If turning ON: activate immediately (first frame)
+                    // If turning OFF: we'll handle this at the end of the tween
+                    if (prop.value > 0.5f)
+                    {
+                        _pooledPropertiesToSnap.Add(prop); // Turn on immediately
+                    }
+                    else
+                    {
+                        _pooledPropertiesToDeactivate.Add(prop); // Deactivate at end
+                    }
+                    continue;
+                }
+
                 // Cache these checks to avoid repeated property access
                 bool hasObjectRef = !string.IsNullOrEmpty(prop.objectReference);
                 bool hasSetterObj = binding.setterObj != null;
                 bool isObjectRef = hasObjectRef || hasSetterObj;
-                bool isGenericActiveProperty = prop.propertyName == "m_IsActive" && binding.targetGameObject != null;
                 float effectiveDuration = transitionInfo.GetEffectiveDuration();
 
-                if (effectiveDuration == 0f || transitionInfo.instantEnableDelayedDisable || isObjectRef || isGenericActiveProperty)
+                if (effectiveDuration == 0f || isObjectRef)
                 {
                     _pooledPropertiesToSnap.Add(prop);
                 }
@@ -349,6 +345,14 @@ namespace EasyStateful.Runtime
                 _isTweening = false;
                 _tweenCompletionCallback?.Invoke();
                 _tweenCompletionCallback = null;
+            }
+        }
+
+        private void ApplyDeactivations(PropertyBindingManager bindingManager)
+        {
+            for (int i = 0; i < _pooledPropertiesToDeactivate.Count; i++)
+            {
+                ApplyProperty(_pooledPropertiesToDeactivate[i], bindingManager);
             }
         }
     }
