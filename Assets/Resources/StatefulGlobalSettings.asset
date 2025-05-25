@@ -19,43 +19,31 @@ MonoBehaviour:
     componentType: 
     overrideEase: 0
     ease: 1
-    overrideDuration: 0
-    duration: 0.5
     instantEnableDelayedDisable: 1
   - propertyName: m_Color.r
     componentType: 
     overrideEase: 1
     ease: 1
-    overrideDuration: 0
-    duration: 0.5
     instantEnableDelayedDisable: 0
   - propertyName: m_Color.g
     componentType: 
     overrideEase: 1
     ease: 1
-    overrideDuration: 0
-    duration: 0.5
     instantEnableDelayedDisable: 0
   - propertyName: m_Color.b
     componentType: 
     overrideEase: 1
     ease: 1
-    overrideDuration: 0
-    duration: 0.5
     instantEnableDelayedDisable: 0
   - propertyName: m_Color.a
     componentType: 
     overrideEase: 1
     ease: 1
-    overrideDuration: 0
-    duration: 0.5
     instantEnableDelayedDisable: 0
   - propertyName: m_Color.a
     componentType: 
     overrideEase: 1
     ease: 1
-    overrideDuration: 0
-    duration: 0.5
     instantEnableDelayedDisable: 0
   defaultBinarySavePath: StatefulData
   defaultAnimationSavePath: Animations
