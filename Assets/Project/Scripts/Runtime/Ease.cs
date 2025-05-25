@@ -37,5 +37,15 @@ namespace EasyStateful.Runtime
         Flash = 32, // changes instantly midway
         InFlash = 33, // always 1
         OutFlash = 34, // 0, but jumps to 1 at end
+        User00 = 35,
+        User01 = 36,
+        User02 = 37,
+        User03 = 38,
+        User04 = 39,
+        User05 = 40,
+        User06 = 41,
+        User07 = 42,
+        User08 = 43,
+        User09 = 44,
     }
 }

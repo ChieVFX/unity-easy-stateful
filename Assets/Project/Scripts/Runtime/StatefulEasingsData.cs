@@ -41,13 +41,59 @@ namespace EasyStateful.Runtime {
         {
             for (int i = 0; i < curves.Length; i++)
             {
-                curves[i] = GetDefaultCurve((Ease)i);
+                Ease easeType = (Ease)i;
+                
+                // Skip user-defined custom easings
+                if (IsUserCustomEasing(easeType))
+                    continue;
+                    
+                curves[i] = GetDefaultCurve(easeType);
             }
         }
 
         public void InitializeWithDefaults()
         {
-            ResetToDefault();
+            // Initialize all slots including user slots with linear curves
+            for (int i = 0; i < curves.Length; i++)
+            {
+                Ease easeType = (Ease)i;
+                
+                if (IsUserCustomEasing(easeType))
+                {
+                    // Initialize user slots with linear curves
+                    curves[i] = AnimationCurve.Linear(0, 0, 1, 1);
+                }
+                else
+                {
+                    curves[i] = GetDefaultCurve(easeType);
+                }
+            }
+        }
+
+        private static bool IsUserCustomEasing(Ease ease)
+        {
+            // Check if this is one of the user custom easing slots
+            string easeName = ease.ToString();
+            return easeName.StartsWith("User");
+        }
+
+        public static string GetEaseDisplayName(Ease ease)
+        {
+            if (IsUserCustomEasing(ease))
+            {
+                string easeName = ease.ToString();
+                if (easeName.StartsWith("User") && easeName.Length >= 6)
+                {
+                    string numberPart = easeName.Substring(4);
+                    if (int.TryParse(numberPart, out int userNumber))
+                    {
+                        return $"User {userNumber:00}";
+                    }
+                }
+                return easeName;
+            }
+            
+            return ease.ToString();
         }
 
         // Helper for creating keyframes

@@ -135,6 +135,16 @@ namespace EasyStateful.Editor {
             serializedSettings.Update();
 
             EditorGUILayout.PropertyField(easingsDataProp, new GUIContent("Easings Data"));
+            
+            // Add button to reset built-in easings to default
+            if (GUILayout.Button("Reset Built-in Easings to Default"))
+            {
+                if (settingsData.easingsData != null)
+                {
+                    settingsData.easingsData.ResetToDefault();
+                    EditorUtility.SetDirty(settingsData.easingsData);
+                }
+            }
 
             EditorGUILayout.LabelField("Global Default Transition Settings", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(defaultTimeProp, new GUIContent("Default Time"));
@@ -148,7 +158,6 @@ namespace EasyStateful.Editor {
             EditorGUILayout.LabelField("Default Save Paths (within Assets/)", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(defaultBinarySavePathProp, new GUIContent("Binary Data Path", "e.g., 'MyGame/StatefulData'. Path is relative to Assets/"));
             EditorGUILayout.PropertyField(defaultAnimationSavePathProp, new GUIContent("Animation Clip Path", "e.g., 'MyGame/Animations'. Path is relative to Assets/"));
-
 
             if (serializedSettings.ApplyModifiedProperties())
             {

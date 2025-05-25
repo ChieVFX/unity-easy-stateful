@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: StatefulGlobalSettings
   m_EditorClassIdentifier: 
   defaultTransitionTime: 0.5
-  defaultEase: 18
+  defaultEase: 30
   propertyOverrides:
   - propertyName: m_IsActive
     componentType: 
