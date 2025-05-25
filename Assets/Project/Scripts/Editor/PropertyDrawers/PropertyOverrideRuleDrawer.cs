@@ -13,92 +13,110 @@ namespace EasyStateful.Editor {
         {
             EditorGUI.BeginProperty(position, label, property);
 
-            Rect foldoutRect = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
-            property.isExpanded = EditorGUI.Foldout(foldoutRect, property.isExpanded, label, true);
+            var propertyNameProp = property.FindPropertyRelative("propertyName");
+            var componentTypeProp = property.FindPropertyRelative("componentType");
+            var pathWildcardProp = property.FindPropertyRelative("pathWildcard");
+            var overrideEaseProp = property.FindPropertyRelative("overrideEase");
+            var easeProp = property.FindPropertyRelative("ease");
+            var instantChangeProp = property.FindPropertyRelative("instantEnableDelayedDisable");
+            var useCustomTimingProp = property.FindPropertyRelative("useCustomTiming");
+            var customTimingStartProp = property.FindPropertyRelative("customTimingStart");
+            var customTimingEndProp = property.FindPropertyRelative("customTimingEnd");
 
-            if (property.isExpanded)
+            float lineHeight = EditorGUIUtility.singleLineHeight;
+            float spacing = EditorGUIUtility.standardVerticalSpacing;
+            Rect currentRect = new Rect(position.x, position.y, position.width, lineHeight);
+
+            // Property Name
+            EditorGUI.PropertyField(currentRect, propertyNameProp);
+            currentRect.y += lineHeight + spacing;
+
+            // Component Type
+            EditorGUI.PropertyField(currentRect, componentTypeProp);
+            currentRect.y += lineHeight + spacing;
+
+            // Path Wildcard
+            EditorGUI.PropertyField(currentRect, pathWildcardProp);
+            currentRect.y += lineHeight + spacing;
+
+            // Instant Change
+            EditorGUI.PropertyField(currentRect, instantChangeProp);
+            currentRect.y += lineHeight + spacing;
+
+            bool isInstantChange = instantChangeProp.boolValue;
+
+            // Override Ease (only if not instant change)
+            if (!isInstantChange)
             {
-                var indentLevel = EditorGUI.indentLevel;
-                EditorGUI.indentLevel = 1; // Set a base indent for content within the foldout
+                EditorGUI.PropertyField(currentRect, overrideEaseProp);
+                currentRect.y += lineHeight + spacing;
 
-                Rect currentRect = new Rect(
-                    position.x + IndentWidth, 
-                    position.y + EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing, 
-                    position.width - IndentWidth, 
-                    EditorGUIUtility.singleLineHeight
-                );
-
-                SerializedProperty propName = property.FindPropertyRelative("propertyName");
-                SerializedProperty compType = property.FindPropertyRelative("componentType");
-                SerializedProperty pathWildcard = property.FindPropertyRelative("pathWildcard");
-                SerializedProperty overrideEaseProp = property.FindPropertyRelative("overrideEase");
-                SerializedProperty easeProp = property.FindPropertyRelative("ease");
-                SerializedProperty instantEnableDelayedDisableProp = property.FindPropertyRelative("instantEnableDelayedDisable");
-
-                EditorGUI.PropertyField(currentRect, propName);
-                currentRect.y += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-
-                EditorGUI.PropertyField(currentRect, compType, new GUIContent("Component Type (Optional)"));
-                currentRect.y += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-
-                EditorGUI.PropertyField(currentRect, pathWildcard, new GUIContent("Path Wildcard (Optional)", "e.g., '*_first', '*button*', 'menu/*'"));
-                currentRect.y += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-                
-                // "Instant Change" toggle - always visible
-                Rect instantChangeToggleRect = new Rect(currentRect.x, currentRect.y, ToggleWidth, currentRect.height);
-                Rect instantChangeLabelRect = new Rect(currentRect.x + ToggleWidth, currentRect.y, EditorGUIUtility.labelWidth - ToggleWidth, currentRect.height);
-                
-                EditorGUI.PropertyField(instantChangeToggleRect, instantEnableDelayedDisableProp, GUIContent.none);
-                EditorGUI.LabelField(instantChangeLabelRect, "Instant Change");
-                currentRect.y += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-
-                bool showStandardOverrides = !instantEnableDelayedDisableProp.boolValue;
-
-                if (showStandardOverrides)
+                if (overrideEaseProp.boolValue)
                 {
-                    // Override Ease
-                    DrawOverrideableProperty(ref currentRect, overrideEaseProp, easeProp, "Ease");
+                    EditorGUI.indentLevel++;
+                    EditorGUI.PropertyField(currentRect, easeProp);
+                    currentRect.y += lineHeight + spacing;
+                    EditorGUI.indentLevel--;
                 }
-                
-                EditorGUI.indentLevel = indentLevel; // Reset indent level
+
+                // Custom Timing (only if not instant change)
+                EditorGUI.PropertyField(currentRect, useCustomTimingProp);
+                currentRect.y += lineHeight + spacing;
+
+                if (useCustomTimingProp.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    
+                    EditorGUI.PropertyField(currentRect, customTimingStartProp, new GUIContent("Start Pause"));
+                    currentRect.y += lineHeight + spacing;
+                    
+                    EditorGUI.PropertyField(currentRect, customTimingEndProp, new GUIContent("End Pause"));
+                    currentRect.y += lineHeight + spacing;
+                    
+                    // Show timing breakdown
+                    float start = customTimingStartProp.floatValue;
+                    float end = customTimingEndProp.floatValue;
+                    float total = start + 1f + end;
+                    
+                    EditorGUI.LabelField(currentRect, $"Timing: {start:F1}s pause + 1s anim + {end:F1}s pause = {total:F1}x duration");
+                    currentRect.y += lineHeight + spacing;
+                    
+                    EditorGUI.indentLevel--;
+                }
             }
+
             EditorGUI.EndProperty();
-        }
-
-        private void DrawOverrideableProperty(ref Rect currentRect, SerializedProperty overrideBoolProp, SerializedProperty valueProp, string label)
-        {
-            Rect toggleRect = new Rect(currentRect.x, currentRect.y, ToggleWidth, currentRect.height);
-            Rect labelRect = new Rect(currentRect.x + ToggleWidth, currentRect.y, EditorGUIUtility.labelWidth - ToggleWidth, currentRect.height);
-            Rect fieldRect = new Rect(currentRect.x + EditorGUIUtility.labelWidth, currentRect.y, currentRect.width - EditorGUIUtility.labelWidth, currentRect.height);
-
-            EditorGUI.PropertyField(toggleRect, overrideBoolProp, GUIContent.none);
-            EditorGUI.LabelField(labelRect, label);
-            using (new EditorGUI.DisabledGroupScope(!overrideBoolProp.boolValue))
-            {
-                EditorGUI.PropertyField(fieldRect, valueProp, GUIContent.none);
-            }
-            currentRect.y += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            float height = EditorGUIUtility.singleLineHeight; // Foldout
-            if (property.isExpanded)
+            var instantChangeProp = property.FindPropertyRelative("instantEnableDelayedDisable");
+            var overrideEaseProp = property.FindPropertyRelative("overrideEase");
+            var useCustomTimingProp = property.FindPropertyRelative("useCustomTiming");
+
+            float lineHeight = EditorGUIUtility.singleLineHeight;
+            float spacing = EditorGUIUtility.standardVerticalSpacing;
+            
+            int lines = 4; // propertyName, componentType, pathWildcard, instantChange
+            
+            if (!instantChangeProp.boolValue)
             {
-                height += EditorGUIUtility.standardVerticalSpacing; // Space after foldout
+                lines += 1; // overrideEase
                 
-                height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing) * 3; // propName, compType, pathWildcard
-                height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing); // "Instant Change" line
-
-                SerializedProperty instantEnableDelayedDisableProp = property.FindPropertyRelative("instantEnableDelayedDisable");
-                bool showStandardOverrides = !instantEnableDelayedDisableProp.boolValue;
-
-                if (showStandardOverrides)
+                if (overrideEaseProp.boolValue)
                 {
-                    height += (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing); // Ease line
+                    lines += 1; // ease
+                }
+                
+                lines += 1; // useCustomTiming
+                
+                if (useCustomTimingProp.boolValue)
+                {
+                    lines += 3; // start, end, timing breakdown
                 }
             }
-            return height;
+
+            return lines * lineHeight + (lines - 1) * spacing;
         }
     } 
 }

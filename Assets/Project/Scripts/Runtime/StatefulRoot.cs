@@ -22,7 +22,6 @@ namespace EasyStateful.Runtime {
         public string[] stateNames;
         public int currentStateIndex = 0;
 
-        [Header("Instance Overrides")]
         public bool overrideDefaultTransitionTime = false;
         public float customDefaultTransitionTime = 0.5f;
         public bool overrideDefaultEase = false;
@@ -200,21 +199,22 @@ namespace EasyStateful.Runtime {
                 UpdateStateNamesArray();
             }
             
-            // Invalidate caches when instance settings change
-            InvalidatePropertyTransitionCache();
-        }
-#endif
-
-#if UNITY_EDITOR
-        public void InvalidatePropertyTransitionCache()
-        {
-            stateManager?.InvalidatePropertyTransitionCache();
-            if (settingsResolver != null)
+            // Force rebuild caches in editor - but only once per validation
+            if (settingsResolver != null && stateManager != null)
             {
                 settingsResolver.BuildPropertyOverrideCache();
-                stateManager?.BuildPropertyTransitionCache(settingsResolver);
+                stateManager.BuildPropertyTransitionCache(settingsResolver);
             }
         }
 #endif
+
+        public void InvalidatePropertyTransitionCache()
+        {
+            if (settingsResolver != null && stateManager != null)
+            {
+                settingsResolver.BuildPropertyOverrideCache();
+                stateManager.BuildPropertyTransitionCache(settingsResolver);
+            }
+        }
     }
 }

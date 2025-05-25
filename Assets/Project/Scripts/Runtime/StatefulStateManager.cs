@@ -10,6 +10,49 @@ namespace EasyStateful.Runtime
         public float duration;
         public Ease ease;
         public bool instantEnableDelayedDisable;
+        public bool useCustomTiming;
+        public float customTimingStart;
+        public float customTimingEnd;
+        
+        public float GetTotalTimingMultiplier()
+        {
+            if (!useCustomTiming || instantEnableDelayedDisable)
+                return 1f;
+            
+            return customTimingStart + 1f + customTimingEnd;
+        }
+        
+        public float GetEffectiveDuration()
+        {
+            return duration * GetTotalTimingMultiplier();
+        }
+        
+        public float GetNormalizedCurveTime(float totalNormalizedTime)
+        {
+            if (!useCustomTiming || instantEnableDelayedDisable)
+                return totalNormalizedTime;
+
+            float totalMultiplier = GetTotalTimingMultiplier();
+            float startPhase = customTimingStart / totalMultiplier;
+            float animPhase = 1f / totalMultiplier;
+            
+            if (totalNormalizedTime <= startPhase)
+            {
+                // In start pause phase
+                return 0f;
+            }
+            else if (totalNormalizedTime >= startPhase + animPhase)
+            {
+                // In end pause phase
+                return 1f;
+            }
+            else
+            {
+                // In animation phase
+                float animProgress = (totalNormalizedTime - startPhase) / animPhase;
+                return Mathf.Clamp01(animProgress);
+            }
+        }
     }
 
     /// <summary>
@@ -62,19 +105,28 @@ namespace EasyStateful.Runtime
                     float duration = settingsResolver.GetEffectiveTransitionTime();
                     Ease ease = settingsResolver.GetEffectiveEase();
                     bool instantEnableDelayedDisable = false;
+                    bool useCustomTiming = false;
+                    float customTimingStart = 0f;
+                    float customTimingEnd = 0f;
 
                     var rule = settingsResolver.GetPropertyOverrideRule(prop.propertyName, prop.componentType, prop.path);
                     if (rule != null)
                     {
                         if (rule.overrideEase) ease = rule.ease;
                         instantEnableDelayedDisable = rule.instantEnableDelayedDisable;
+                        useCustomTiming = rule.useCustomTiming;
+                        customTimingStart = rule.customTimingStart;
+                        customTimingEnd = rule.customTimingEnd;
                     }
 
                     _propertyTransitionCache[prop] = new PropertyTransitionInfo
                     {
                         duration = duration,
                         ease = ease,
-                        instantEnableDelayedDisable = instantEnableDelayedDisable
+                        instantEnableDelayedDisable = instantEnableDelayedDisable,
+                        useCustomTiming = useCustomTiming,
+                        customTimingStart = customTimingStart,
+                        customTimingEnd = customTimingEnd
                     };
                 }
             }

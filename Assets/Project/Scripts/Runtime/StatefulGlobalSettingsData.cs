@@ -14,6 +14,12 @@ namespace EasyStateful.Runtime {
         // This is the primary toggle for "Instant Change" behavior in UI and logic
         public bool instantEnableDelayedDisable = false;
 
+        public bool useCustomTiming = false;
+        [Tooltip("Time units to pause at start (sampling curve at 0). Animation time is divided by (start + 1 + end).")]
+        public float customTimingStart = 0f;
+        [Tooltip("Time units to pause at end (sampling curve at 1). Animation time is divided by (start + 1 + end).")]
+        public float customTimingEnd = 0f;
+
         public PropertyOverrideRule() {}
 
         public PropertyOverrideRule(string propName, string compType = "", bool useInstantChange = false, bool useLinearEase = false, string pathPattern = "")
@@ -26,6 +32,50 @@ namespace EasyStateful.Runtime {
             {
                 overrideEase = true;
                 ease = Ease.Linear;
+            }
+            useCustomTiming = false;
+            customTimingStart = 0f;
+            customTimingEnd = 0f;
+        }
+
+        /// <summary>
+        /// Get the total timing multiplier (start + 1 + end)
+        /// </summary>
+        public float GetTotalTimingMultiplier()
+        {
+            if (!useCustomTiming || instantEnableDelayedDisable)
+                return 1f;
+            
+            return customTimingStart + 1f + customTimingEnd;
+        }
+
+        /// <summary>
+        /// Get the normalized time for the actual animation curve sampling
+        /// </summary>
+        public float GetNormalizedCurveTime(float totalNormalizedTime)
+        {
+            if (!useCustomTiming || instantEnableDelayedDisable)
+                return totalNormalizedTime;
+
+            float totalMultiplier = GetTotalTimingMultiplier();
+            float startPhase = customTimingStart / totalMultiplier;
+            float animPhase = 1f / totalMultiplier;
+            
+            if (totalNormalizedTime <= startPhase)
+            {
+                // In start pause phase
+                return 0f;
+            }
+            else if (totalNormalizedTime >= startPhase + animPhase)
+            {
+                // In end pause phase
+                return 1f;
+            }
+            else
+            {
+                // In animation phase
+                float animProgress = (totalNormalizedTime - startPhase) / animPhase;
+                return Mathf.Clamp01(animProgress);
             }
         }
 
