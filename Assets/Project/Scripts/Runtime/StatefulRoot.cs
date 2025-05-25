@@ -45,12 +45,36 @@ namespace EasyStateful.Runtime {
         
         // Pooled collections for TweenToState to reduce GC
         private List<Property> _pooledPropertiesToSnap = new List<Property>();
+        private List<(Property prop, PropertyBinding binding, float initialValue, Ease ease)> _pooledPropertiesToTween = 
+            new List<(Property, PropertyBinding, float, Ease)>();
         
-        // Add at class level:
-        private static Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
+        // Pre-allocated arrays for the tween loop to avoid foreach allocations
+        private TweenItem[] _tweenItemsArray = new TweenItem[32]; // Start with reasonable size
+        private int _tweenItemsCount = 0;
+        
+        // Global caches to reduce per-instance allocations
+        private static readonly Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
+        private static readonly Dictionary<(Type, string), MemberInfo> _memberInfoCache = new Dictionary<(Type, string), MemberInfo>();
+        
+        // Pre-compiled expression cache - this is the big one for GC reduction
+        private static readonly Dictionary<(Type componentType, string propertyName, bool isGetter), Delegate> _compiledExpressionCache = 
+            new Dictionary<(Type, string, bool), Delegate>();
 
-        // Add at class level:
+        // Instance-specific caches
         private Dictionary<(string propertyName, string componentType), PropertyOverrideRule> _propertyOverrideCache;
+        private Dictionary<Property, PropertyTransitionInfo> _propertyTransitionCache = new();
+
+        // UniTask cancellation
+        private CancellationTokenSource _currentTweenCancellation;
+
+        // Struct to avoid allocations in the tween loop
+        private struct TweenItem
+        {
+            public PropertyBinding binding;
+            public float initialValue;
+            public float targetValue;
+            public Ease ease;
+        }
 
         // At class level:
         private struct PropertyTransitionInfo
@@ -59,13 +83,6 @@ namespace EasyStateful.Runtime {
             public Ease ease;
             public bool instantEnableDelayedDisable;
         }
-
-        private Dictionary<Property, PropertyTransitionInfo> _propertyTransitionCache = new();
-
-        private static Dictionary<(Type, string), MemberInfo> _memberInfoCache = new();
-
-        // UniTask cancellation
-        private CancellationTokenSource _currentTweenCancellation;
 
         [Serializable]
         private class PropertyBinding
@@ -293,12 +310,8 @@ namespace EasyStateful.Runtime {
             _currentTweenCancellation?.Dispose();
             _currentTweenCancellation = new CancellationTokenSource();
             
-            // Combine cancellation tokens
-            var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken, 
-                _currentTweenCancellation.Token,
-                this.GetCancellationTokenOnDestroy()
-            ).Token;
+            // Use a simpler cancellation approach to reduce allocations
+            var combinedToken = _currentTweenCancellation.Token;
             
             var state = stateMachine.states.Find(s => s.name == stateName);
             if (state == null)
@@ -310,26 +323,9 @@ namespace EasyStateful.Runtime {
             float overallDuration = duration ?? GetEffectiveTransitionTime();
             Ease overallEase = ease ?? GetEffectiveEase();
 
-            #if UNITY_EDITOR
-            bool usePooling = Application.isPlaying;
-            #else
-            const bool usePooling = true;
-            #endif
-
-            List<Property> propertiesToSnap;
-            List<(Property prop, PropertyBinding binding, float initialValue, Ease ease)> propertiesToTween;
-
-            if (usePooling)
-            {
-                _pooledPropertiesToSnap.Clear();
-                propertiesToSnap = _pooledPropertiesToSnap;
-                propertiesToTween = new List<(Property, PropertyBinding, float, Ease)>();
-            }
-            else
-            {
-                propertiesToSnap = new List<Property>();
-                propertiesToTween = new List<(Property, PropertyBinding, float, Ease)>();
-            }
+            // Clear pooled collections
+            _pooledPropertiesToSnap.Clear();
+            _pooledPropertiesToTween.Clear();
 
             foreach (var prop in state.properties)
             {
@@ -427,12 +423,12 @@ namespace EasyStateful.Runtime {
 
                 if (finalPropDuration == 0f || isObjectRef || isGenericActiveProperty)
                 {
-                    propertiesToSnap.Add(prop);
+                    _pooledPropertiesToSnap.Add(prop);
                 }
                 else if (binding.setter != null && binding.component != null && binding.getter != null) // Numeric, tweenable property
                 {
                     float initialValue = GetCurrentValue(binding);
-                    propertiesToTween.Add((prop, binding, initialValue, finalPropEase));
+                    _pooledPropertiesToTween.Add((prop, binding, initialValue, finalPropEase));
                 }
                 else
                 {
@@ -441,19 +437,22 @@ namespace EasyStateful.Runtime {
             }
 
             // Apply all snapped properties first
-            foreach (var propToSnap in propertiesToSnap)
+            for (int i = 0; i < _pooledPropertiesToSnap.Count; i++)
             {
-                ApplyProperty(propToSnap);
+                ApplyProperty(_pooledPropertiesToSnap[i]);
             }
 
             // If no properties to tween, we're done
-            if (propertiesToTween.Count == 0)
+            if (_pooledPropertiesToTween.Count == 0)
                 return;
+
+            // Convert to array-based approach to avoid foreach allocations
+            PrepareArrayBasedTween();
 
             // Start the unified tween using UniTask
             try
             {
-                await TweenPropertiesAsync(propertiesToTween, overallDuration, combinedToken);
+                await TweenPropertiesAsync(overallDuration, combinedToken);
             }
             catch (OperationCanceledException)
             {
@@ -467,21 +466,46 @@ namespace EasyStateful.Runtime {
         }
 
         /// <summary>
-        /// Unified tweening method using UniTask that handles all properties with different easings
+        /// Prepare array-based tween data to avoid foreach allocations during the tween loop
         /// </summary>
-        private async UniTask TweenPropertiesAsync(
-            List<(Property prop, PropertyBinding binding, float initialValue, Ease ease)> propertiesToTween,
-            float duration,
-            CancellationToken cancellationToken)
+        private void PrepareArrayBasedTween()
+        {
+            _tweenItemsCount = _pooledPropertiesToTween.Count;
+            
+            // Resize array if needed
+            if (_tweenItemsArray.Length < _tweenItemsCount)
+            {
+                _tweenItemsArray = new TweenItem[Mathf.NextPowerOfTwo(_tweenItemsCount)];
+            }
+
+            // Copy data to array
+            for (int i = 0; i < _tweenItemsCount; i++)
+            {
+                var item = _pooledPropertiesToTween[i];
+                _tweenItemsArray[i] = new TweenItem
+                {
+                    binding = item.binding,
+                    initialValue = item.initialValue,
+                    targetValue = item.prop.value,
+                    ease = item.ease
+                };
+            }
+        }
+
+        /// <summary>
+        /// Optimized tweening method using arrays instead of collections to reduce GC
+        /// </summary>
+        private async UniTask TweenPropertiesAsync(float duration, CancellationToken cancellationToken)
         {
             if (duration <= 0f)
             {
                 // Apply final values immediately
-                foreach (var item in propertiesToTween)
+                for (int i = 0; i < _tweenItemsCount; i++)
                 {
+                    ref var item = ref _tweenItemsArray[i];
                     if (item.binding.component != null)
                     {
-                        item.binding.setter(item.binding.component, item.prop.value);
+                        item.binding.setter(item.binding.component, item.targetValue);
 #if UNITY_EDITOR
                         if (!Application.isPlaying && GUI.changed)
                         {
@@ -501,13 +525,14 @@ namespace EasyStateful.Runtime {
                 
                 float normalizedTime = Mathf.Clamp01(elapsedTime / duration);
                 
-                // Update all properties with their respective easings
-                foreach (var item in propertiesToTween)
+                // Update all properties with their respective easings using for loop to avoid allocations
+                for (int i = 0; i < _tweenItemsCount; i++)
                 {
+                    ref var item = ref _tweenItemsArray[i];
                     if (item.binding.component != null)
                     {
                         float easedProgress = SampleEasing(item.ease, normalizedTime);
-                        float interpolatedValue = Mathf.LerpUnclamped(item.initialValue, item.prop.value, easedProgress);
+                        float interpolatedValue = Mathf.LerpUnclamped(item.initialValue, item.targetValue, easedProgress);
                         item.binding.setter(item.binding.component, interpolatedValue);
                         
 #if UNITY_EDITOR
@@ -535,11 +560,12 @@ namespace EasyStateful.Runtime {
             }
             
             // Ensure final values are set
-            foreach (var item in propertiesToTween)
+            for (int i = 0; i < _tweenItemsCount; i++)
             {
+                ref var item = ref _tweenItemsArray[i];
                 if (item.binding.component != null)
                 {
-                    item.binding.setter(item.binding.component, item.prop.value);
+                    item.binding.setter(item.binding.component, item.targetValue);
 #if UNITY_EDITOR
                     if (!Application.isPlaying && GUI.changed)
                     {
@@ -601,23 +627,11 @@ namespace EasyStateful.Runtime {
             }
         }
 
-        private void TweenProperty(Property prop, float duration, Ease ease)
-        {
-            // This method is no longer used. Its logic has been integrated into TweenToState and ApplyProperty.
-            // Consider removing this method to avoid confusion.
-            // For now, let's make it a no-op or log a warning if called.
-            Debug.LogWarning("TweenProperty is deprecated and should not be called directly.", this);
-        }
-
         /// <summary>
         /// Retrieves or creates a binding for this property.
         /// </summary>
         private PropertyBinding GetOrCreateBinding(Property prop, out Transform target)
         {
-            // Intern strings for cache keys
-            var componentTypeKey = string.Intern(prop.componentType);
-            var propertyNameKey = string.Intern(prop.propertyName);
-
             target = transform.Find(prop.path);
             if (target == null)
             {
@@ -631,19 +645,19 @@ namespace EasyStateful.Runtime {
                 bindingCache[prop.path] = compMap;
             }
 
-            var cacheKey = (componentTypeKey, propertyNameKey);
+            var cacheKey = (prop.componentType, prop.propertyName);
             if (compMap.TryGetValue(cacheKey, out var binding))
             {
                 return binding;
             }
 
             // Special handling for GameObject.m_IsActive
-            if (propertyNameKey == "m_IsActive" && 
-                (string.IsNullOrEmpty(componentTypeKey) || componentTypeKey == typeof(GameObject).FullName || componentTypeKey == typeof(GameObject).AssemblyQualifiedName))
+            if (prop.propertyName == "m_IsActive" && 
+                (string.IsNullOrEmpty(prop.componentType) || prop.componentType == typeof(GameObject).FullName || prop.componentType == typeof(GameObject).AssemblyQualifiedName))
             {
                 binding = new PropertyBinding { 
                     targetGameObject = target.gameObject, 
-                    propertyName = propertyNameKey, 
+                    propertyName = prop.propertyName, 
                     isGameObjectActiveProperty = true 
                 };
                 binding.getter = (_) => binding.targetGameObject.activeSelf ? 1f : 0f;
@@ -652,53 +666,76 @@ namespace EasyStateful.Runtime {
             }
 
             // Type caching
-            if (!_typeCache.TryGetValue(componentTypeKey, out var compType))
+            if (!_typeCache.TryGetValue(prop.componentType, out var compType))
             {
-                compType = Type.GetType(componentTypeKey);
+                compType = Type.GetType(prop.componentType);
                 if (compType != null)
-                    _typeCache[componentTypeKey] = compType;
+                    _typeCache[prop.componentType] = compType;
             }
             if (compType == null)
             {
-                Debug.LogWarning($"Component type not found: {componentTypeKey} for path {prop.path}, property {propertyNameKey}", this);
+                Debug.LogWarning($"Component type not found: {prop.componentType} for path {prop.path}, property {prop.propertyName}", this);
                 return null;
             }
 
             var comp = target.GetComponent(compType);
             if (comp == null)
             {
-                Debug.LogWarning($"Component {compType.Name} not found on {prop.path} for property {propertyNameKey}", this);
+                Debug.LogWarning($"Component {compType.Name} not found on {prop.path} for property {prop.propertyName}", this);
                 return null;
             }
 
-            binding = new PropertyBinding { component = comp, targetGameObject = target.gameObject, propertyName = propertyNameKey };
-
-            // MemberInfo caching
-            var memberKey = (compType, propertyNameKey);
-            if (!_memberInfoCache.TryGetValue(memberKey, out var memberInfo))
-            {
-                memberInfo = compType.GetProperty(propertyNameKey, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo
-                          ?? compType.GetField(propertyNameKey, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo;
-                _memberInfoCache[memberKey] = memberInfo;
-            }
+            binding = new PropertyBinding { component = comp, targetGameObject = target.gameObject, propertyName = prop.propertyName };
 
             bool isObjectRef = !string.IsNullOrEmpty(prop.objectReference);
 
             if (isObjectRef)
             {
-                var pi = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                var fi = compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                
-                if (pi != null) binding.propInfo = pi;
-                else if (fi != null) binding.fieldInfo = fi;
-                else {
-                    Debug.LogWarning($"Object reference Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}.", this);
-                    compMap[cacheKey] = binding; 
-                    return binding; 
-                }
+                SetupObjectReferenceBinding(binding, prop, compType);
+            }
+            else
+            {
+                SetupNumericBinding(binding, prop, compType);
+            }
 
-                Type memberType = pi?.PropertyType ?? fi?.FieldType;
+            compMap[cacheKey] = binding; // Cache the binding, complete or not
+            return binding;
+        }
 
+        /// <summary>
+        /// Setup object reference binding with caching
+        /// </summary>
+        private void SetupObjectReferenceBinding(PropertyBinding binding, Property prop, Type compType)
+        {
+            var memberKey = (compType, prop.propertyName);
+            if (!_memberInfoCache.TryGetValue(memberKey, out var memberInfo))
+            {
+                memberInfo = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo
+                          ?? compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo;
+                _memberInfoCache[memberKey] = memberInfo;
+            }
+
+            var pi = memberInfo as PropertyInfo;
+            var fi = memberInfo as FieldInfo;
+            
+            if (pi != null) binding.propInfo = pi;
+            else if (fi != null) binding.fieldInfo = fi;
+            else {
+                Debug.LogWarning($"Object reference Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}.", this);
+                return; 
+            }
+
+            Type memberType = pi?.PropertyType ?? fi?.FieldType;
+
+            // Use cached compiled expressions
+            var expressionKey = (compType, prop.propertyName, false); // false = setter
+            if (_compiledExpressionCache.TryGetValue(expressionKey, out var cachedSetter))
+            {
+                binding.setterObj = (Action<Component, UnityEngine.Object>)cachedSetter;
+            }
+            else
+            {
+                // Compile and cache the expression
                 if (pi != null && pi.CanWrite)
                 {
                     var setterMethod = pi.GetSetMethod(true);
@@ -709,20 +746,18 @@ namespace EasyStateful.Runtime {
                             var componentParamExpr = Expression.Parameter(typeof(Component), "c_");
                             var objectParamExpr = Expression.Parameter(typeof(UnityEngine.Object), "o_");
                             var castCompExpr = Expression.Convert(componentParamExpr, compType);
-                            // It's crucial to cast the incoming UnityEngine.Object to the specific type the property expects.
                             var castObjExpr = Expression.Convert(objectParamExpr, memberType);
                             var callSetterExpr = Expression.Call(castCompExpr, setterMethod, castObjExpr);
-                            binding.setterObj = Expression.Lambda<Action<Component, UnityEngine.Object>>(callSetterExpr, componentParamExpr, objectParamExpr).Compile();
+                            var compiledSetter = Expression.Lambda<Action<Component, UnityEngine.Object>>(callSetterExpr, componentParamExpr, objectParamExpr).Compile();
+                            
+                            _compiledExpressionCache[expressionKey] = compiledSetter;
+                            binding.setterObj = compiledSetter;
                         }
                         catch (Exception ex)
                         {
                             Debug.LogError($"Failed to compile object setter for Property '{prop.propertyName}' on type '{compType.Name}' (path {prop.path}): {ex.Message}. Will fallback to reflection invoke.", this);
                             binding.setterObj = (c, o) => setterMethod.Invoke(c, new object[] { o }); // Fallback
                         }
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"Object reference Property '{prop.propertyName}' on type '{compType.Name}' for path {prop.path} has no writable setter.", this);
                     }
                 }
                 else if (fi != null && !fi.IsLiteral && !fi.IsInitOnly)
@@ -735,7 +770,10 @@ namespace EasyStateful.Runtime {
                         var castObjExpr = Expression.Convert(objectParamExpr, memberType);
                         var fieldAccessExpr = Expression.Field(castCompExpr, fi);
                         var assignExpr = Expression.Assign(fieldAccessExpr, castObjExpr);
-                        binding.setterObj = Expression.Lambda<Action<Component, UnityEngine.Object>>(assignExpr, componentParamExpr, objectParamExpr).Compile();
+                        var compiledSetter = Expression.Lambda<Action<Component, UnityEngine.Object>>(assignExpr, componentParamExpr, objectParamExpr).Compile();
+                        
+                        _compiledExpressionCache[expressionKey] = compiledSetter;
+                        binding.setterObj = compiledSetter;
                     }
                     catch (Exception ex)
                     {
@@ -743,93 +781,122 @@ namespace EasyStateful.Runtime {
                         binding.setterObj = (c, o) => fi.SetValue(c, o); // Fallback
                     }
                 }
-                else if (fi != null && (fi.IsLiteral || fi.IsInitOnly))
-                {
-                     Debug.LogWarning($"Object reference Field '{prop.propertyName}' on type '{compType.Name}' for path {prop.path} is read-only.", this);
-                }
             }
-            else // Numeric property, use Expression Trees for getter/setter
+        }
+
+        /// <summary>
+        /// Setup numeric binding with caching
+        /// </summary>
+        private void SetupNumericBinding(PropertyBinding binding, Property prop, Type compType)
+        {
+            // Check for cached compiled expressions first
+            var getterKey = (compType, prop.propertyName, true); // true = getter
+            var setterKey = (compType, prop.propertyName, false); // false = setter
+
+            if (_compiledExpressionCache.TryGetValue(getterKey, out var cachedGetter))
             {
-                // Parameter expressions for the delegates
-                var componentParam = Expression.Parameter(typeof(Component), "c");
-                var valueParam = Expression.Parameter(typeof(float), "val"); // For setter
+                binding.getter = (Func<Component, float>)cachedGetter;
+            }
 
-                Expression castComponent = Expression.Convert(componentParam, compType);
-                Expression finalPropertyAccess = null; 
-                Type targetPropertyType = null; 
+            if (_compiledExpressionCache.TryGetValue(setterKey, out var cachedSetter))
+            {
+                binding.setter = (Action<Component, float>)cachedSetter;
+            }
 
-                if (prop.propertyName.Contains("."))
+            // If both are cached, we're done
+            if (binding.getter != null && binding.setter != null)
+                return;
+
+            // Need to compile expressions - do reflection work
+            var memberKey = (compType, prop.propertyName);
+            if (!_memberInfoCache.TryGetValue(memberKey, out var memberInfo))
+            {
+                memberInfo = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo
+                          ?? compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo;
+                _memberInfoCache[memberKey] = memberInfo;
+            }
+
+            // Parameter expressions for the delegates
+            var componentParam = Expression.Parameter(typeof(Component), "c");
+            var valueParam = Expression.Parameter(typeof(float), "val"); // For setter
+
+            Expression castComponent = Expression.Convert(componentParam, compType);
+            Expression finalPropertyAccess = null; 
+            Type targetPropertyType = null; 
+
+            if (prop.propertyName.Contains("."))
+            {
+                binding.isSubProperty = true;
+                int dotIdx = prop.propertyName.IndexOf('.');
+                string mainName = prop.propertyName.Substring(0, dotIdx);
+                string subName = prop.propertyName.Substring(dotIdx + 1);
+
+                binding.mainPropInfo = compType.GetProperty(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (binding.mainPropInfo == null) binding.mainFieldInfo = compType.GetField(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (binding.mainPropInfo == null && binding.mainFieldInfo == null && mainName.StartsWith("m_"))
                 {
-                    binding.isSubProperty = true;
-                    int dotIdx = prop.propertyName.IndexOf('.');
-                    string mainName = prop.propertyName.Substring(0, dotIdx);
-                    string subName = prop.propertyName.Substring(dotIdx + 1);
-
-                    binding.mainPropInfo = compType.GetProperty(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (binding.mainPropInfo == null) binding.mainFieldInfo = compType.GetField(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-                    if (binding.mainPropInfo == null && binding.mainFieldInfo == null && mainName.StartsWith("m_"))
-                    {
-                        var fallbackName = char.ToLowerInvariant(mainName[2]) + mainName.Substring(3);
-                        binding.mainPropInfo = compType.GetProperty(fallbackName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    }
-                    
-                    Expression mainMemberAccess = null;
-                    Type mainMemberType = null;
-
-                    if (binding.mainPropInfo != null) { 
-                        mainMemberAccess = Expression.Property(castComponent, binding.mainPropInfo);
-                        mainMemberType = binding.mainPropInfo.PropertyType;
-                    } else if (binding.mainFieldInfo != null) {
-                        mainMemberAccess = Expression.Field(castComponent, binding.mainFieldInfo);
-                        mainMemberType = binding.mainFieldInfo.FieldType;
-                    } else {
-                        Debug.LogWarning($"Main member '{mainName}' not found for sub-property '{prop.propertyName}' on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
-                        compMap[cacheKey] = binding; return binding; // Cache incomplete binding
-                    }
-                    binding.mainValueType = mainMemberType;
-
-                    binding.subPropInfo = mainMemberType.GetProperty(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (binding.subPropInfo == null) binding.subFieldInfo = mainMemberType.GetField(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-                    if (binding.subPropInfo != null) {
-                        finalPropertyAccess = Expression.Property(mainMemberAccess, binding.subPropInfo);
-                        targetPropertyType = binding.subPropInfo.PropertyType;
-                    } else if (binding.subFieldInfo != null) {
-                        finalPropertyAccess = Expression.Field(mainMemberAccess, binding.subFieldInfo);
-                        targetPropertyType = binding.subFieldInfo.FieldType;
-                    } else {
-                        Debug.LogWarning($"Sub member '{subName}' not found on main member '{mainName}' (type: {mainMemberType.Name}) for property '{prop.propertyName}' on path {prop.path}. Cannot create binding.", this);
-                        compMap[cacheKey] = binding; return binding; // Cache incomplete binding
-                    }
-                    binding.subValueType = targetPropertyType;
+                    var fallbackName = char.ToLowerInvariant(mainName[2]) + mainName.Substring(3);
+                    binding.mainPropInfo = compType.GetProperty(fallbackName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 }
-                else 
-                {
-                    binding.propInfo = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (binding.propInfo == null) binding.fieldInfo = compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                
+                Expression mainMemberAccess = null;
+                Type mainMemberType = null;
 
-                    if (binding.propInfo != null) {
-                        finalPropertyAccess = Expression.Property(castComponent, binding.propInfo);
-                        targetPropertyType = binding.propInfo.PropertyType;
-                    } else if (binding.fieldInfo != null) {
-                        finalPropertyAccess = Expression.Field(castComponent, binding.fieldInfo);
-                        targetPropertyType = binding.fieldInfo.FieldType;
-                    } else {
-                        Debug.LogWarning($"Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
-                        compMap[cacheKey] = binding; return binding; // Cache incomplete binding
-                    }
-                    binding.valueType = targetPropertyType;
+                if (binding.mainPropInfo != null) { 
+                    mainMemberAccess = Expression.Property(castComponent, binding.mainPropInfo);
+                    mainMemberType = binding.mainPropInfo.PropertyType;
+                } else if (binding.mainFieldInfo != null) {
+                    mainMemberAccess = Expression.Field(castComponent, binding.mainFieldInfo);
+                    mainMemberType = binding.mainFieldInfo.FieldType;
+                } else {
+                    Debug.LogWarning($"Main member '{mainName}' not found for sub-property '{prop.propertyName}' on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
+                    return;
                 }
+                binding.mainValueType = mainMemberType;
 
-                if (finalPropertyAccess == null || targetPropertyType == null)
-                {
-                    // Should have been caught above, but as a safeguard
-                    Debug.LogWarning($"Failed to establish property access for '{prop.propertyName}' on '{compType.Name}' (path {prop.path}). Binding will be incomplete.", this);
-                    compMap[cacheKey] = binding; return binding;
+                binding.subPropInfo = mainMemberType.GetProperty(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (binding.subPropInfo == null) binding.subFieldInfo = mainMemberType.GetField(subName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (binding.subPropInfo != null) {
+                    finalPropertyAccess = Expression.Property(mainMemberAccess, binding.subPropInfo);
+                    targetPropertyType = binding.subPropInfo.PropertyType;
+                } else if (binding.subFieldInfo != null) {
+                    finalPropertyAccess = Expression.Field(mainMemberAccess, binding.subFieldInfo);
+                    targetPropertyType = binding.subFieldInfo.FieldType;
+                } else {
+                    Debug.LogWarning($"Sub member '{subName}' not found on main member '{mainName}' (type: {mainMemberType.Name}) for property '{prop.propertyName}' on path {prop.path}. Cannot create binding.", this);
+                    return;
                 }
+                binding.subValueType = targetPropertyType;
+            }
+            else 
+            {
+                binding.propInfo = memberInfo as PropertyInfo;
+                binding.fieldInfo = memberInfo as FieldInfo;
 
-                // Create Getter: Func<Component, float>
+                if (binding.propInfo != null) {
+                    finalPropertyAccess = Expression.Property(castComponent, binding.propInfo);
+                    targetPropertyType = binding.propInfo.PropertyType;
+                } else if (binding.fieldInfo != null) {
+                    finalPropertyAccess = Expression.Field(castComponent, binding.fieldInfo);
+                    targetPropertyType = binding.fieldInfo.FieldType;
+                } else {
+                    Debug.LogWarning($"Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
+                    return;
+                }
+                binding.valueType = targetPropertyType;
+            }
+
+            if (finalPropertyAccess == null || targetPropertyType == null)
+            {
+                Debug.LogWarning($"Failed to establish property access for '{prop.propertyName}' on '{compType.Name}' (path {prop.path}). Binding will be incomplete.", this);
+                return;
+            }
+
+            // Create and cache getter if not already cached
+            if (binding.getter == null)
+            {
                 try
                 {
                     Expression getterBody = finalPropertyAccess;
@@ -845,14 +912,21 @@ namespace EasyStateful.Runtime {
                         }
                     }
                     var getterLambda = Expression.Lambda<Func<Component, float>>(getterBody, componentParam);
-                    binding.getter = getterLambda.Compile();
+                    var compiledGetter = getterLambda.Compile();
+                    
+                    _compiledExpressionCache[getterKey] = compiledGetter;
+                    binding.getter = compiledGetter;
                 }
                 catch (Exception ex)
                 {
                     Debug.LogError($"Failed to compile getter for {prop.propertyName} on {compType.Name} (path {prop.path}): {ex.Message}. This property may not be readable for tweening.", this);
                     binding.getter = null; 
                 }
-                
+            }
+            
+            // Create and cache setter if not already cached
+            if (binding.setter == null)
+            {
                 // Determine if a setter can be attempted
                 bool canAttemptSetterCompilation = false;
                 if (binding.isSubProperty) {
@@ -866,12 +940,7 @@ namespace EasyStateful.Runtime {
                     canAttemptSetterCompilation = (binding.propInfo?.CanWrite == true) || (binding.fieldInfo != null && !binding.fieldInfo.IsInitOnly && !binding.fieldInfo.IsLiteral);
                 }
 
-                if (!canAttemptSetterCompilation)
-                {
-                    // Debug.LogWarning($"Property/Field '{prop.propertyName}' on type '{compType.Name}' (path {prop.path}) is not considered writable. It will not be numerically tweenable.", this);
-                    // binding.setter will remain null
-                }
-                else
+                if (canAttemptSetterCompilation)
                 {
                     try
                     {
@@ -927,7 +996,10 @@ namespace EasyStateful.Runtime {
                         }
 
                         var setterLambda = Expression.Lambda<Action<Component, float>>(assignExpression, componentParam, valueParam);
-                        binding.setter = setterLambda.Compile();
+                        var compiledSetter = setterLambda.Compile();
+                        
+                        _compiledExpressionCache[setterKey] = compiledSetter;
+                        binding.setter = compiledSetter;
                     }
                     catch (Exception ex)
                     {
@@ -936,9 +1008,6 @@ namespace EasyStateful.Runtime {
                     }
                 }
             }
-
-            compMap[cacheKey] = binding; // Cache the binding, complete or not
-            return binding;
         }
 
         /// <summary>
@@ -957,14 +1026,11 @@ namespace EasyStateful.Runtime {
 
             if (binding.component == null)
             {
-                // This path should ideally be caught by GetOrCreateBinding returning null if component is missing
                 Debug.LogWarning($"Cannot get current value for '{binding.propertyName}': Component is null in binding.", this);
                 return 0f;
             }
             if (binding.getter == null)
             {
-                // This implies GetOrCreateBinding failed to create a getter, or it's an object ref property without a numeric getter.
-                // For tweening, numeric properties must have a getter.
                 Debug.LogWarning($"Cannot get current value for '{binding.propertyName}' on component '{binding.component.GetType().Name}': Getter is null. Property may not be numeric/tweenable or binding setup failed.", this);
                 return 0f; 
             }
@@ -992,8 +1058,6 @@ namespace EasyStateful.Runtime {
                 stateMachine = new UIStateMachine();
                 UpdateStateNamesArray();
             }
-            // Note: `groupSettings` changes don't directly alter `stateNames`
-            // but might influence behavior if `Update()` calls `TweenToState` due to `currentStateIndex` change.
         }
 
         [ContextMenu("Update State Names Array")]
@@ -1037,7 +1101,6 @@ namespace EasyStateful.Runtime {
                 prevStateIndex = currentStateIndex;
                 if (stateNames != null && currentStateIndex >= 0 && currentStateIndex < stateNames.Length)
                 {
-                    // TweenToState will use GetEffectiveTransitionTime and GetEffectiveEase
                     TweenToState(stateNames[currentStateIndex]); 
                 }
             }
@@ -1065,7 +1128,6 @@ namespace EasyStateful.Runtime {
             {
                 foreach (var prop in state.properties)
                 {
-                    // Use your existing logic to resolve duration/ease/instantEnableDelayedDisable
                     float duration = GetEffectiveTransitionTime();
                     Ease ease = GetEffectiveEase();
                     bool instantEnableDelayedDisable = false;
