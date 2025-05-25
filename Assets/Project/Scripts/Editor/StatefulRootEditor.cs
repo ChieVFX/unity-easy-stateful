@@ -505,6 +505,7 @@ namespace EasyStateful.Editor {
             if (!EditorApplication.isPlaying)
             {
                 lastUpdateTime = EditorApplication.timeSinceStartup;
+                EditorApplication.update -= EditorManualUpdate; // Remove any existing subscription first
                 EditorApplication.update += EditorManualUpdate;
                 EditorApplication.QueuePlayerLoopUpdate();
             }
@@ -512,20 +513,27 @@ namespace EasyStateful.Editor {
 
         private void EditorManualUpdate()
         {
+            // Check if the root object still exists and is valid
+            if (root == null)
+            {
+                EditorApplication.update -= EditorManualUpdate;
+                return;
+            }
+
             double now = EditorApplication.timeSinceStartup;
-            float dt = (float)(now - lastUpdateTime);
             lastUpdateTime = now;
             
-            // Since we're using UniTask instead of DOTween, we don't need DOTween.ManualUpdate
-            // UniTask handles its own scheduling in editor mode
+            // Force the StatefulRoot to update its tweens in editor mode
+            root.EditorUpdate();
             
             SceneView.RepaintAll();
             InternalEditorUtility.RepaintAllViews();
             
-            // Check if we should stop updating (this is a simplified check)
-            // In a real implementation, you might want to track active tweens differently
-            if (now - lastUpdateTime > 5.0) // Stop after 5 seconds of no activity
+            // Check if we should stop updating - stop when no tween is active
+            if (!root.IsTweening)
+            {
                 EditorApplication.update -= EditorManualUpdate;
+            }
         }
 
         private UIStateMachine BuildStateMachineFromClip(AnimationClip clip)

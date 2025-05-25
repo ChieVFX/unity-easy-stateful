@@ -192,26 +192,30 @@ namespace EasyStateful.Runtime {
 
         void Awake()
         {
-            bindingManager = new PropertyBindingManager(transform);
-            
-            if (statefulDataAsset != null)
-            {
-                LoadFromAsset(statefulDataAsset);
-            }
-            else
-            {
-                stateMachine = new UIStateMachine();
-                UpdateStateNamesArray(); 
-            }
-            BuildPropertyOverrideCache();
-            BuildPropertyTransitionCache();
+            InitializeIfNeeded();
         }
 
-        void OnDestroy()
+        private void InitializeIfNeeded()
         {
-            // Cancel any running tweens
-            _currentTweenCancellation?.Cancel();
-            _currentTweenCancellation?.Dispose();
+            if (bindingManager == null)
+            {
+                bindingManager = new PropertyBindingManager(transform);
+            }
+            
+            if (stateMachine == null)
+            {
+                if (statefulDataAsset != null)
+                {
+                    LoadFromAsset(statefulDataAsset);
+                }
+                else
+                {
+                    stateMachine = new UIStateMachine();
+                    UpdateStateNamesArray(); 
+                }
+                BuildPropertyOverrideCache();
+                BuildPropertyTransitionCache();
+            }
         }
 
         /// <summary>
@@ -237,6 +241,8 @@ namespace EasyStateful.Runtime {
         /// </summary>
         public void SnapToState(string stateName)
         {
+            InitializeIfNeeded();
+
 #if UNITY_EDITOR
             if (!Application.isPlaying)
             {
@@ -264,6 +270,8 @@ namespace EasyStateful.Runtime {
         /// </summary>
         public UniTask TaskTweenToState(string stateName, float? duration = null, Ease? ease = null, CancellationToken cancellationToken = default)
         {
+            InitializeIfNeeded();
+
 #if UNITY_EDITOR
             if (!Application.isPlaying)
             {
@@ -499,6 +507,8 @@ namespace EasyStateful.Runtime {
 
         private void ApplyProperty(Property prop)
         {
+            InitializeIfNeeded();
+            
             var binding = bindingManager.GetOrCreateBinding(prop, out Transform target);
             if (binding == null) return; // Target itself might be null if path is bad
 
@@ -506,7 +516,7 @@ namespace EasyStateful.Runtime {
             {
                 binding.targetGameObject.SetActive(prop.value > 0.5f); // Assuming 1 for true, 0 for false
 #if UNITY_EDITOR
-                if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.targetGameObject);
+                if (!Application.isPlaying) EditorUtility.SetDirty(binding.targetGameObject);
 #endif
             }
             else if (!string.IsNullOrEmpty(prop.objectReference) && binding.setterObj != null && binding.component != null)
@@ -521,7 +531,7 @@ namespace EasyStateful.Runtime {
                     Debug.LogError($"Error executing compiled object setter for {prop.propertyName} on {binding.component.GetType().Name} with object {obj?.name} (Path: {prop.objectReference}): {ex.Message}", this);
                 }
 #if UNITY_EDITOR
-                if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.component);
+                if (!Application.isPlaying) EditorUtility.SetDirty(binding.component);
 #endif
             }
             else if (binding.setter != null && binding.component != null)
@@ -535,7 +545,7 @@ namespace EasyStateful.Runtime {
                      Debug.LogError($"Error executing compiled numeric setter for {prop.propertyName} on {binding.component.GetType().Name}: {ex.Message}", this);
                 }
 #if UNITY_EDITOR
-                if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(binding.component);
+                if (!Application.isPlaying) EditorUtility.SetDirty(binding.component);
 #endif
             }
         }
@@ -582,10 +592,19 @@ namespace EasyStateful.Runtime {
             }
             if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(this);
         }
-        #else
-        public void UpdateStateNamesArray()
+
+        /// <summary>
+        /// Public method for editor to manually update tweens
+        /// </summary>
+        public void EditorUpdate()
         {
+            Update();
         }
+
+        /// <summary>
+        /// Check if currently tweening (for editor)
+        /// </summary>
+        public bool IsTweening => _isTweening;
         #endif
 
         /// <summary>
@@ -603,7 +622,7 @@ namespace EasyStateful.Runtime {
                 }
             }
 
-            // Handle active tween updates
+            // Handle active tween updates - NOW WORKS IN EDITOR TOO
             if (_isTweening)
             {
                 // Check cancellation by comparing token source references (no allocations)
@@ -643,7 +662,7 @@ namespace EasyStateful.Runtime {
                         item.binding.setter(item.binding.component, interpolatedValue);
                         
 #if UNITY_EDITOR
-                        if (!Application.isPlaying && GUI.changed)
+                        if (!Application.isPlaying)
                         {
                             EditorUtility.SetDirty(item.binding.component);
                         }
@@ -662,7 +681,7 @@ namespace EasyStateful.Runtime {
                         {
                             item.binding.setter(item.binding.component, item.targetValue);
 #if UNITY_EDITOR
-                            if (!Application.isPlaying && GUI.changed)
+                            if (!Application.isPlaying)
                             {
                                 EditorUtility.SetDirty(item.binding.component);
                             }
@@ -711,7 +730,11 @@ namespace EasyStateful.Runtime {
 
         private void BuildPropertyOverrideCache()
         {
-            _propertyOverrideCache = new Dictionary<(string, string), PropertyOverrideRule>();
+            if (_propertyOverrideCache == null)
+                _propertyOverrideCache = new Dictionary<(string, string), PropertyOverrideRule>();
+            else
+                _propertyOverrideCache.Clear();
+                
             if (groupSettings != null && groupSettings.propertyOverrides != null)
             {
                 foreach (var r in groupSettings.propertyOverrides)
@@ -724,7 +747,11 @@ namespace EasyStateful.Runtime {
 
         private void BuildPropertyTransitionCache()
         {
-            _propertyTransitionCache.Clear();
+            if (_propertyTransitionCache == null)
+                _propertyTransitionCache = new Dictionary<Property, PropertyTransitionInfo>();
+            else
+                _propertyTransitionCache.Clear();
+                
             if (stateMachine == null || stateMachine.states == null) return;
 
             foreach (var state in stateMachine.states)
