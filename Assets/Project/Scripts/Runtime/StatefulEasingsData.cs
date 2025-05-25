@@ -45,6 +45,11 @@ namespace EasyStateful.Runtime {
             }
         }
 
+        public void InitializeWithDefaults()
+        {
+            ResetToDefault();
+        }
+
         // Helper for creating keyframes
         // For smooth curves, inDerivFunc and outDerivFunc will be the same.
         // For curves with corners (like Bounce), they can be different.

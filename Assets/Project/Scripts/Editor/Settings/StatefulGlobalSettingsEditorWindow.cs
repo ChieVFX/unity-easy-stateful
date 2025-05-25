@@ -30,17 +30,37 @@ namespace EasyStateful.Editor {
 
         void LoadOrCreateSettings()
         {
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
             StatefulGlobalSettings.ClearCachedInstance(); 
-    #endif
-            settingsData = StatefulGlobalSettings.Data; 
+#endif
+            
+            // Try to load existing settings first
+            string resourcesFolder = "Assets/Resources";
+            string settingsAssetPath = Path.Combine(resourcesFolder, $"{StatefulGlobalSettings.GlobalSettingsPathConstant}.asset");
+            
+            settingsData = AssetDatabase.LoadAssetAtPath<StatefulGlobalSettingsData>(settingsAssetPath);
 
             if (settingsData == null) 
             {
+                Debug.Log("Creating new StatefulGlobalSettings and StatefulEasingsData assets...");
+                
+                // Create Resources folder if it doesn't exist
+                if (!AssetDatabase.IsValidFolder(resourcesFolder))
+                {
+                    AssetDatabase.CreateFolder("Assets", "Resources");
+                }
+
+                // Create the easings data first
+                var easingsData = CreateInstance<StatefulEasingsData>();
+                easingsData.InitializeWithDefaults();
+                
+                string easingsAssetPath = Path.Combine(resourcesFolder, "StatefulEasingsData.asset");
+                AssetDatabase.CreateAsset(easingsData, easingsAssetPath);
+                
+                // Create the global settings
                 settingsData = CreateInstance<StatefulGlobalSettingsData>();
-                // Initialize with defaults from the class definition if any
                 settingsData.defaultTransitionTime = 0.5f;
-                settingsData.defaultEase = Ease.Linear;
+                settingsData.defaultEase = Ease.OutExpo;
                 settingsData.propertyOverrides = new List<PropertyOverrideRule>() {
                     new PropertyOverrideRule("m_IsActive", "", true, false),
                     new PropertyOverrideRule("m_Color.r", "", false, true),
@@ -50,28 +70,40 @@ namespace EasyStateful.Editor {
                 };
                 settingsData.defaultBinarySavePath = "StatefulData";
                 settingsData.defaultAnimationSavePath = "Animations";
-
-
-                string resourcesFolder = "Assets/Resources";
-                if (!AssetDatabase.IsValidFolder(resourcesFolder))
-                {
-                    AssetDatabase.CreateFolder("Assets", "Resources");
-                }
-                string assetPath = Path.Combine(resourcesFolder, $"{StatefulGlobalSettings.GlobalSettingsPathConstant}.asset");
+                settingsData.easingsData = easingsData; // Link the easings data
                 
-                AssetDatabase.CreateAsset(settingsData, assetPath);
+                AssetDatabase.CreateAsset(settingsData, settingsAssetPath);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
-                Debug.Log($"Created new StatefulGlobalSettingsData at {assetPath}");
                 
-    #if UNITY_EDITOR
+                Debug.Log($"Created StatefulGlobalSettings at {settingsAssetPath}");
+                Debug.Log($"Created StatefulEasingsData at {easingsAssetPath}");
+                
+#if UNITY_EDITOR
                 StatefulGlobalSettings.ClearCachedInstance(); 
-    #endif
-                settingsData = StatefulGlobalSettings.Data; 
+#endif
             }
             
             if (settingsData != null)
             {
+                // If easings data is missing, create it
+                if (settingsData.easingsData == null)
+                {
+                    Debug.Log("Creating missing StatefulEasingsData...");
+                    var easingsData = CreateInstance<StatefulEasingsData>();
+                    easingsData.InitializeWithDefaults();
+                    
+                    string easingsAssetPath = Path.Combine(resourcesFolder, "StatefulEasingsData.asset");
+                    AssetDatabase.CreateAsset(easingsData, easingsAssetPath);
+                    
+                    settingsData.easingsData = easingsData;
+                    EditorUtility.SetDirty(settingsData);
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                    
+                    Debug.Log($"Created missing StatefulEasingsData at {easingsAssetPath}");
+                }
+                
                 serializedSettings = new SerializedObject(settingsData);
                 defaultTimeProp = serializedSettings.FindProperty("defaultTransitionTime");
                 defaultEaseProp = serializedSettings.FindProperty("defaultEase");
@@ -121,9 +153,9 @@ namespace EasyStateful.Editor {
             if (serializedSettings.ApplyModifiedProperties())
             {
                 EditorUtility.SetDirty(settingsData);
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
                 StatefulGlobalSettings.ClearCachedInstance(); // Ensure changes are picked up immediately
-    #endif
+#endif
             }
 
             EditorGUILayout.EndScrollView();

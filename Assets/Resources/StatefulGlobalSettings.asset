@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: StatefulGlobalSettings
   m_EditorClassIdentifier: 
   defaultTransitionTime: 0.5
-  defaultEase: 30
+  defaultEase: 18
   propertyOverrides:
   - propertyName: m_IsActive
     componentType: 
@@ -40,11 +40,6 @@ MonoBehaviour:
     overrideEase: 1
     ease: 1
     instantEnableDelayedDisable: 0
-  - propertyName: m_Color.a
-    componentType: 
-    overrideEase: 1
-    ease: 1
-    instantEnableDelayedDisable: 0
   defaultBinarySavePath: StatefulData
   defaultAnimationSavePath: Animations
-  easingsData: {fileID: 11400000, guid: 08d320f3eb3ffeb4c83a05743b0de1c9, type: 2}
+  easingsData: {fileID: 11400000, guid: 8cd264c0391311d41ac75178e2f97196, type: 2}

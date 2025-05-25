@@ -65,11 +65,7 @@ namespace EasyStateful.Runtime
 
         public StatefulEasingsData GetEffectiveEasingsData()
         {
-            // Tier 1: Group Settings
-            if (root.groupSettings != null && root.groupSettings.easingsData != null)
-                return root.groupSettings.easingsData;
-            
-            // Tier 2: Global Settings
+            // Only use Global Settings
             if (StatefulGlobalSettings.EasingsData != null)
                 return StatefulGlobalSettings.EasingsData;
             
