@@ -149,6 +149,36 @@ MonoBehaviour:
         propertyName: m_SizeDelta.x
         value: 100
         objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
     - name: Initial
       time: 0.016666668
       properties:
@@ -282,7 +312,37 @@ MonoBehaviour:
         componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
           Culture=neutral, PublicKeyToken=null
         propertyName: m_SizeDelta.x
-        value: 99.78481
+        value: 100
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
         objectReference: 
     - name: Red
       time: 0.033333335
@@ -417,7 +477,37 @@ MonoBehaviour:
         componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
           Culture=neutral, PublicKeyToken=null
         propertyName: m_SizeDelta.x
-        value: 99.385185
+        value: 100
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
         objectReference: 
     - name: Hide
       time: 0.050000004
@@ -426,7 +516,7 @@ MonoBehaviour:
         componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
           PublicKeyToken=null
         propertyName: m_Color.a
-        value: 0
+        value: 1.4988003e-13
         objectReference: 
       - path: Image (1)
         componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
@@ -468,7 +558,7 @@ MonoBehaviour:
         componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
           PublicKeyToken=null
         propertyName: m_Color.a
-        value: 0
+        value: 1.4988003e-13
         objectReference: 
       - path: Image (3)
         componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
@@ -492,7 +582,7 @@ MonoBehaviour:
         componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
           PublicKeyToken=null
         propertyName: m_Color.a
-        value: 0
+        value: 1.4988003e-13
         objectReference: 
       - path: Image (3)
         componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
@@ -553,4 +643,199 @@ MonoBehaviour:
           Culture=neutral, PublicKeyToken=null
         propertyName: m_SizeDelta.x
         value: 99.17
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 20
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 100
+        objectReference: 
+    - name: Green
+      time: 0.06666667
+      properties:
+      - path: Image (1)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.006182432
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.006182432
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.r
+        value: 0.006182432
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.g
+        value: 1
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.b
+        value: 0
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.UI.Image, UnityEngine.UI, Version=1.0.0.0, Culture=neutral,
+          PublicKeyToken=null
+        propertyName: m_Color.a
+        value: 1
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_AnchoredPosition.x
+        value: 0
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_AnchoredPosition.x
+        value: 0
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_AnchoredPosition.x
+        value: 0
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_AnchoredPosition.y
+        value: -58.8
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_AnchoredPosition.y
+        value: -29.6
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_AnchoredPosition.y
+        value: 0
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_IsActive
+        value: 1
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_IsActive
+        value: 1
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_IsActive
+        value: 1
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 131.5
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 1.56
+        objectReference: 
+      - path: Image (2)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 1.56
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.y
+        value: 1.56
+        objectReference: 
+      - path: Image (3)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 131.5
+        objectReference: 
+      - path: Image (1)
+        componentType: UnityEngine.RectTransform, UnityEngine.CoreModule, Version=0.0.0.0,
+          Culture=neutral, PublicKeyToken=null
+        propertyName: m_SizeDelta.x
+        value: 131.5
         objectReference: 
