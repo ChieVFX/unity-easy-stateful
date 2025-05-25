@@ -14,6 +14,13 @@ namespace EasyStateful.Runtime {
         public Ease customDefaultEase = Ease.InOutQuad;
 
         [Tooltip("These rules override global property rules and apply before them.")]
-        public List<PropertyOverrideRule> propertyOverrides = new List<PropertyOverrideRule>();
+        public List<PropertyOverrideRule> propertyOverrides = new List<PropertyOverrideRule>()
+        {
+            new PropertyOverrideRule("m_IsActive", "", true, false),
+            new PropertyOverrideRule("m_Color.r", "", false, true),
+            new PropertyOverrideRule("m_Color.g", "", false, true),
+            new PropertyOverrideRule("m_Color.b", "", false, true),
+            new PropertyOverrideRule("m_Color.a", "", false, true),
+        };
     }
 }
