@@ -22,5 +22,20 @@ namespace EasyStateful.Runtime {
             new PropertyOverrideRule("m_Color.b", "", false, true),
             new PropertyOverrideRule("m_Color.a", "", false, true),
         };
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            // Find all StatefulRoots that use this group settings and invalidate their caches
+            var allRoots = FindObjectsOfType<StatefulRoot>();
+            foreach (var root in allRoots)
+            {
+                if (root.groupSettings == this)
+                {
+                    root.InvalidatePropertyTransitionCache();
+                }
+            }
+        }
+#endif
     }
 }

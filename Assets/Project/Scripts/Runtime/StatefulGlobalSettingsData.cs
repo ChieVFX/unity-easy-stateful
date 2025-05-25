@@ -125,5 +125,12 @@ namespace EasyStateful.Runtime {
         public string defaultAnimationSavePath = "Animations";
 
         public StatefulEasingsData easingsData;
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            StatefulGlobalSettings.NotifySettingsChanged();
+        }
+#endif
     }
 }

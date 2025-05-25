@@ -199,6 +199,21 @@ namespace EasyStateful.Runtime {
                 stateManager.LoadStateMachine(new UIStateMachine());
                 UpdateStateNamesArray();
             }
+            
+            // Invalidate caches when instance settings change
+            InvalidatePropertyTransitionCache();
+        }
+#endif
+
+#if UNITY_EDITOR
+        public void InvalidatePropertyTransitionCache()
+        {
+            stateManager?.InvalidatePropertyTransitionCache();
+            if (settingsResolver != null)
+            {
+                settingsResolver.BuildPropertyOverrideCache();
+                stateManager?.BuildPropertyTransitionCache(settingsResolver);
+            }
         }
 #endif
     }

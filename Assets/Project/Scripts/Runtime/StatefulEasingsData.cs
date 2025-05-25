@@ -35,6 +35,7 @@ namespace EasyStateful.Runtime {
                         curves[i] = old[i];
                 }
             }
+            StatefulGlobalSettings.NotifySettingsChanged();
         }
 
         public void ResetToDefault()

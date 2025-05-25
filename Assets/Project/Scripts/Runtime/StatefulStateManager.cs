@@ -81,5 +81,12 @@ namespace EasyStateful.Runtime
         }
 
         public Dictionary<Property, PropertyTransitionInfo> GetPropertyTransitionCache() => _propertyTransitionCache;
+
+#if UNITY_EDITOR
+        public void InvalidatePropertyTransitionCache()
+        {
+            _propertyTransitionCache?.Clear();
+        }
+#endif
     }
 } 

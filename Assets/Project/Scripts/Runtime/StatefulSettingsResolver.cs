@@ -8,27 +8,60 @@ namespace EasyStateful.Runtime
     /// </summary>
     public class StatefulSettingsResolver
     {
-        private StatefulRoot root;
-        private Dictionary<(string propertyName, string componentType), PropertyOverrideRule> _propertyOverrideCache;
-        private Dictionary<(string propertyName, string componentType, string path), PropertyOverrideRule> _pathBasedOverrideCache;
+        private StatefulRoot statefulRoot;
+        private Dictionary<string, PropertyOverrideRule> propertyOverrideCache;
+        
+#if UNITY_EDITOR
+        private static event System.Action OnSettingsChanged;
+        
+        static StatefulSettingsResolver()
+        {
+            // Subscribe to settings changes in editor
+            StatefulGlobalSettings.OnSettingsChanged += InvalidateAllCaches;
+        }
+        
+        public static void InvalidateAllCaches()
+        {
+            OnSettingsChanged?.Invoke();
+        }
+#endif
 
         public StatefulSettingsResolver(StatefulRoot root)
         {
-            this.root = root;
-            BuildPropertyOverrideCache();
+            statefulRoot = root;
+            
+#if UNITY_EDITOR
+            OnSettingsChanged += InvalidateCache;
+#endif
         }
+
+#if UNITY_EDITOR
+        ~StatefulSettingsResolver()
+        {
+            OnSettingsChanged -= InvalidateCache;
+        }
+        
+        private void InvalidateCache()
+        {
+            propertyOverrideCache?.Clear();
+            BuildPropertyOverrideCache();
+            
+            // Also invalidate state manager cache
+            statefulRoot?.InvalidatePropertyTransitionCache();
+        }
+#endif
 
         public float GetEffectiveTransitionTime()
         {
             // Tier 3: StatefulRoot instance override
-            if (root.overrideDefaultTransitionTime)
+            if (statefulRoot.overrideDefaultTransitionTime)
             {
-                return root.customDefaultTransitionTime;
+                return statefulRoot.customDefaultTransitionTime;
             }
             // Tier 4: GroupSettings override
-            if (root.groupSettings != null && root.groupSettings.overrideGlobalDefaultTransitionTime)
+            if (statefulRoot.groupSettings != null && statefulRoot.groupSettings.overrideGlobalDefaultTransitionTime)
             {
-                return root.groupSettings.customDefaultTransitionTime;
+                return statefulRoot.groupSettings.customDefaultTransitionTime;
             }
             // Tier 5: Global Settings
             return StatefulGlobalSettings.DefaultTime;
@@ -37,14 +70,14 @@ namespace EasyStateful.Runtime
         public Ease GetEffectiveEase()
         {
             // Tier 3: StatefulRoot instance override
-            if (root.overrideDefaultEase)
+            if (statefulRoot.overrideDefaultEase)
             {
-                return root.customDefaultEase;
+                return statefulRoot.customDefaultEase;
             }
             // Tier 4: GroupSettings override
-            if (root.groupSettings != null && root.groupSettings.overrideGlobalDefaultEase)
+            if (statefulRoot.groupSettings != null && statefulRoot.groupSettings.overrideGlobalDefaultEase)
             {
-                return root.groupSettings.customDefaultEase;
+                return statefulRoot.groupSettings.customDefaultEase;
             }
             // Tier 5: Global Settings
             return StatefulGlobalSettings.DefaultEase;
@@ -52,41 +85,38 @@ namespace EasyStateful.Runtime
 
         public PropertyOverrideRule GetPropertyOverrideRule(string propertyName, string componentTypeFullName, string path = "")
         {
-            // First check path-based cache if path is provided
+            // Create cache key
+            string cacheKey;
             if (!string.IsNullOrEmpty(path))
             {
-                var pathKey = (propertyName, componentTypeFullName, path);
-                if (_pathBasedOverrideCache != null && _pathBasedOverrideCache.TryGetValue(pathKey, out var cachedRule))
-                    return cachedRule;
-
-                // Find matching rule and cache it
-                var matchingRule = FindMatchingRule(propertyName, componentTypeFullName, path);
-                if (_pathBasedOverrideCache == null)
-                    _pathBasedOverrideCache = new Dictionary<(string, string, string), PropertyOverrideRule>();
-                
-                _pathBasedOverrideCache[pathKey] = matchingRule;
-                return matchingRule;
+                cacheKey = $"{propertyName}|{componentTypeFullName}|{path}";
             }
-
-            // Fallback to original property-based cache
-            if (_propertyOverrideCache != null)
+            else
             {
-                if (_propertyOverrideCache.TryGetValue((propertyName, componentTypeFullName), out var rule))
-                    return rule;
-                if (_propertyOverrideCache.TryGetValue((propertyName, ""), out rule))
-                    return rule;
+                cacheKey = $"{propertyName}|{componentTypeFullName}";
             }
 
-            // Check global settings
-            return StatefulGlobalSettings.GetGlobalPropertyOverrideRule(propertyName, componentTypeFullName, path);
+            // Check cache first
+            if (propertyOverrideCache != null && propertyOverrideCache.TryGetValue(cacheKey, out var cachedRule))
+                return cachedRule;
+
+            // Find matching rule
+            var matchingRule = FindMatchingRule(propertyName, componentTypeFullName, path);
+            
+            // Cache the result
+            if (propertyOverrideCache == null)
+                propertyOverrideCache = new Dictionary<string, PropertyOverrideRule>();
+            
+            propertyOverrideCache[cacheKey] = matchingRule;
+            return matchingRule;
         }
 
         private PropertyOverrideRule FindMatchingRule(string propertyName, string componentTypeFullName, string path)
         {
             // Check group settings first
-            if (root.groupSettings != null && root.groupSettings.propertyOverrides != null)
+            if (statefulRoot.groupSettings != null && statefulRoot.groupSettings.propertyOverrides != null)
             {
-                foreach (var rule in root.groupSettings.propertyOverrides)
+                foreach (var rule in statefulRoot.groupSettings.propertyOverrides)
                 {
                     if (rule.Matches(propertyName, componentTypeFullName, path))
                         return rule;
@@ -109,23 +139,39 @@ namespace EasyStateful.Runtime
 
         public void BuildPropertyOverrideCache()
         {
-            if (_propertyOverrideCache == null)
-                _propertyOverrideCache = new Dictionary<(string, string), PropertyOverrideRule>();
+            if (propertyOverrideCache == null)
+                propertyOverrideCache = new Dictionary<string, PropertyOverrideRule>();
             else
-                _propertyOverrideCache.Clear();
+                propertyOverrideCache.Clear();
 
-            // Clear path-based cache when rebuilding
-            _pathBasedOverrideCache?.Clear();
-                
-            if (root.groupSettings != null && root.groupSettings.propertyOverrides != null)
+            // Pre-cache group settings rules (non-wildcard only for simple lookup)
+            if (statefulRoot.groupSettings != null && statefulRoot.groupSettings.propertyOverrides != null)
             {
-                foreach (var r in root.groupSettings.propertyOverrides)
+                foreach (var r in statefulRoot.groupSettings.propertyOverrides)
                 {
-                    // Only cache non-wildcard rules in the simple cache
+                    // Only cache non-wildcard rules for simple property+component lookups
                     if (string.IsNullOrEmpty(r.pathWildcard))
                     {
-                        var key = (r.propertyName, r.componentType ?? "");
-                        _propertyOverrideCache[key] = r;
+                        string key = $"{r.propertyName}|{r.componentType ?? ""}";
+                        propertyOverrideCache[key] = r;
+                    }
+                }
+            }
+
+            // Pre-cache global settings rules (non-wildcard only)
+            var globalRules = StatefulGlobalSettings.PropertyOverrides;
+            if (globalRules != null)
+            {
+                foreach (var r in globalRules)
+                {
+                    if (string.IsNullOrEmpty(r.pathWildcard))
+                    {
+                        string key = $"{r.propertyName}|{r.componentType ?? ""}";
+                        // Only add if not already cached from group settings (group takes priority)
+                        if (!propertyOverrideCache.ContainsKey(key))
+                        {
+                            propertyOverrideCache[key] = r;
+                        }
                     }
                 }
             }

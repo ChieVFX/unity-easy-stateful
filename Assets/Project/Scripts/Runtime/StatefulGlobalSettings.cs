@@ -114,5 +114,14 @@ namespace EasyStateful.Runtime {
 
             return generalRule;
         }
+
+#if UNITY_EDITOR
+        public static event System.Action OnSettingsChanged;
+        
+        public static void NotifySettingsChanged()
+        {
+            OnSettingsChanged?.Invoke();
+        }
+#endif
     }
 }
