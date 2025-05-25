@@ -313,7 +313,17 @@ namespace EasyStateful.Runtime {
             // Use a simpler cancellation approach to reduce allocations
             var combinedToken = _currentTweenCancellation.Token;
             
-            var state = stateMachine.states.Find(s => s.name == stateName);
+            // Find state without LINQ to avoid allocation
+            State state = null;
+            for (int i = 0; i < stateMachine.states.Count; i++)
+            {
+                if (stateMachine.states[i].name == stateName)
+                {
+                    state = stateMachine.states[i];
+                    break;
+                }
+            }
+            
             if (state == null)
             {
                 Debug.LogWarning($"State not found: {stateName}", this);
@@ -327,8 +337,11 @@ namespace EasyStateful.Runtime {
             _pooledPropertiesToSnap.Clear();
             _pooledPropertiesToTween.Clear();
 
-            foreach (var prop in state.properties)
+            // Process properties without foreach to avoid enumerator allocation
+            for (int propIndex = 0; propIndex < state.properties.Count; propIndex++)
             {
+                var prop = state.properties[propIndex];
+                
 #if UNITY_EDITOR
                 bool inEditor = !Application.isPlaying;
 #else
@@ -362,8 +375,7 @@ namespace EasyStateful.Runtime {
                 else
                 {
                     // Use cached info in play mode
-                    PropertyTransitionInfo info;
-                    if (!_propertyTransitionCache.TryGetValue(prop, out info))
+                    if (!_propertyTransitionCache.TryGetValue(prop, out PropertyTransitionInfo info))
                     {
                         info.duration = duration ?? GetEffectiveTransitionTime();
                         info.ease = ease ?? GetEffectiveEase();
@@ -502,7 +514,7 @@ namespace EasyStateful.Runtime {
                 // Apply final values immediately
                 for (int i = 0; i < _tweenItemsCount; i++)
                 {
-                    ref var item = ref _tweenItemsArray[i];
+                    var item = _tweenItemsArray[i]; // Remove ref to fix C# 9.0 compatibility
                     if (item.binding.component != null)
                     {
                         item.binding.setter(item.binding.component, item.targetValue);
@@ -528,7 +540,7 @@ namespace EasyStateful.Runtime {
                 // Update all properties with their respective easings using for loop to avoid allocations
                 for (int i = 0; i < _tweenItemsCount; i++)
                 {
-                    ref var item = ref _tweenItemsArray[i];
+                    var item = _tweenItemsArray[i]; // Remove ref to fix C# 9.0 compatibility
                     if (item.binding.component != null)
                     {
                         float easedProgress = SampleEasing(item.ease, normalizedTime);
@@ -562,7 +574,7 @@ namespace EasyStateful.Runtime {
             // Ensure final values are set
             for (int i = 0; i < _tweenItemsCount; i++)
             {
-                ref var item = ref _tweenItemsArray[i];
+                var item = _tweenItemsArray[i]; // Remove ref to fix C# 9.0 compatibility
                 if (item.binding.component != null)
                 {
                     item.binding.setter(item.binding.component, item.targetValue);
@@ -580,6 +592,11 @@ namespace EasyStateful.Runtime {
         /// Convenience method for non-async calls (maintains backward compatibility)
         /// </summary>
         public void TweenToState(string stateName, float? duration = null, Ease? ease = null)
+        {
+            TaskTweenToState(stateName, duration, ease, CancellationToken.None).Forget();
+        }
+
+        public void TweenToState(string stateName, float duration, Ease ease)
         {
             TaskTweenToState(stateName, duration, ease, CancellationToken.None).Forget();
         }
@@ -665,7 +682,7 @@ namespace EasyStateful.Runtime {
                 return binding;
             }
 
-            // Type caching
+            // Type caching - avoid string allocations in Type.GetType
             if (!_typeCache.TryGetValue(prop.componentType, out var compType))
             {
                 compType = Type.GetType(prop.componentType);
