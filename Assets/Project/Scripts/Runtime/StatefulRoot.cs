@@ -123,6 +123,13 @@ namespace EasyStateful.Runtime {
         private AnimationClip editorClip;
         #endif
 
+        // Add these fields at class level (replace the existing ones)
+        private bool _isTweening = false;
+        private float _tweenStartTime;
+        private float _tweenDuration;
+        private bool _tweenCancelled = false;
+        private UniTaskCompletionSource _tweenCompletionSource;
+
         private float GetEffectiveTransitionTime()
         {
             // Tier 3: StatefulRoot instance override
@@ -461,7 +468,7 @@ namespace EasyStateful.Runtime {
             // Convert to array-based approach to avoid foreach allocations
             PrepareArrayBasedTween();
 
-            // Start the unified tween using UniTask
+            // Start the unified tween using pure callback approach
             try
             {
                 await TweenPropertiesAsync(overallDuration, combinedToken);
@@ -472,6 +479,8 @@ namespace EasyStateful.Runtime {
             }
             finally
             {
+                _isTweening = false;
+                _tweenCompletionSource = null;
                 _currentTweenCancellation?.Dispose();
                 _currentTweenCancellation = null;
             }
@@ -505,16 +514,16 @@ namespace EasyStateful.Runtime {
         }
 
         /// <summary>
-        /// Optimized tweening method using arrays instead of collections to reduce GC
+        /// Zero-allocation tweening method using pure callback approach
         /// </summary>
-        private async UniTask TweenPropertiesAsync(float duration, CancellationToken cancellationToken)
+        private UniTask TweenPropertiesAsync(float duration, CancellationToken cancellationToken)
         {
             if (duration <= 0f)
             {
                 // Apply final values immediately
                 for (int i = 0; i < _tweenItemsCount; i++)
                 {
-                    var item = _tweenItemsArray[i]; // Remove ref to fix C# 9.0 compatibility
+                    var item = _tweenItemsArray[i];
                     if (item.binding.component != null)
                     {
                         item.binding.setter(item.binding.component, item.targetValue);
@@ -526,66 +535,36 @@ namespace EasyStateful.Runtime {
 #endif
                     }
                 }
-                return;
+                return UniTask.CompletedTask;
             }
 
-            float elapsedTime = 0f;
+            // Set up the tween state for Update loop
+            _isTweening = true;
+            _tweenDuration = duration;
+            _tweenCancelled = false;
+            _tweenCompletionSource = new UniTaskCompletionSource();
             
-            while (elapsedTime < duration)
+            // Register cancellation callback to avoid checking every frame
+            if (cancellationToken.CanBeCanceled)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                
-                float normalizedTime = Mathf.Clamp01(elapsedTime / duration);
-                
-                // Update all properties with their respective easings using for loop to avoid allocations
-                for (int i = 0; i < _tweenItemsCount; i++)
-                {
-                    var item = _tweenItemsArray[i]; // Remove ref to fix C# 9.0 compatibility
-                    if (item.binding.component != null)
-                    {
-                        float easedProgress = SampleEasing(item.ease, normalizedTime);
-                        float interpolatedValue = Mathf.LerpUnclamped(item.initialValue, item.targetValue, easedProgress);
-                        item.binding.setter(item.binding.component, interpolatedValue);
-                        
-#if UNITY_EDITOR
-                        if (!Application.isPlaying && GUI.changed)
-                        {
-                            EditorUtility.SetDirty(item.binding.component);
-                        }
-#endif
-                    }
-                }
-                
-#if UNITY_EDITOR
-                if (!Application.isPlaying)
-                {
-                    // In editor, use unscaled time
-                    elapsedTime += Time.unscaledDeltaTime;
-                    await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
-                }
-                else
-#endif
-                {
-                    elapsedTime += Time.deltaTime;
-                    await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
-                }
+                cancellationToken.Register(() => {
+                    _tweenCancelled = true;
+                });
             }
             
-            // Ensure final values are set
-            for (int i = 0; i < _tweenItemsCount; i++)
-            {
-                var item = _tweenItemsArray[i]; // Remove ref to fix C# 9.0 compatibility
-                if (item.binding.component != null)
-                {
-                    item.binding.setter(item.binding.component, item.targetValue);
 #if UNITY_EDITOR
-                    if (!Application.isPlaying && GUI.changed)
-                    {
-                        EditorUtility.SetDirty(item.binding.component);
-                    }
-#endif
-                }
+            if (!Application.isPlaying)
+            {
+                _tweenStartTime = (float)EditorApplication.timeSinceStartup;
             }
+            else
+#endif
+            {
+                _tweenStartTime = Time.time;
+            }
+
+            // Return the completion source task - no polling, just pure callback
+            return _tweenCompletionSource.Task;
         }
 
         /// <summary>
@@ -1111,9 +1090,13 @@ namespace EasyStateful.Runtime {
         }
         #endif
 
+        /// <summary>
+        /// Update method that handles the tween loop without allocations
+        /// </summary>
         private void Update()
         {
-            if (Application.isPlaying && currentStateIndex != prevStateIndex) // Only run this logic in play mode
+            // Handle inspector-driven state changes in play mode
+            if (Application.isPlaying && currentStateIndex != prevStateIndex)
             {
                 prevStateIndex = currentStateIndex;
                 if (stateNames != null && currentStateIndex >= 0 && currentStateIndex < stateNames.Length)
@@ -1121,6 +1104,111 @@ namespace EasyStateful.Runtime {
                     TweenToState(stateNames[currentStateIndex]); 
                 }
             }
+
+            // Handle active tween updates
+            if (_isTweening)
+            {
+                // Check cancellation without throwing exceptions
+                if (_tweenCancelled)
+                {
+                    _isTweening = false;
+                    _tweenCompletionSource?.TrySetCanceled();
+                    return;
+                }
+
+                float currentTime;
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    currentTime = (float)EditorApplication.timeSinceStartup;
+                }
+                else
+#endif
+                {
+                    currentTime = Time.time;
+                }
+
+                float elapsedTime = currentTime - _tweenStartTime;
+                float normalizedTime = Mathf.Clamp01(elapsedTime / _tweenDuration);
+
+                // Update all properties with their respective easings
+                for (int i = 0; i < _tweenItemsCount; i++)
+                {
+                    var item = _tweenItemsArray[i];
+                    if (item.binding.component != null)
+                    {
+                        // Inline the easing calculation to avoid method call overhead
+                        float easedProgress = SampleEasingInline(item.ease, normalizedTime);
+                        float interpolatedValue = Mathf.LerpUnclamped(item.initialValue, item.targetValue, easedProgress);
+                        item.binding.setter(item.binding.component, interpolatedValue);
+                        
+#if UNITY_EDITOR
+                        if (!Application.isPlaying && GUI.changed)
+                        {
+                            EditorUtility.SetDirty(item.binding.component);
+                        }
+#endif
+                    }
+                }
+
+                // Check if tween is complete
+                if (normalizedTime >= 1f)
+                {
+                    // Ensure final values are set
+                    for (int i = 0; i < _tweenItemsCount; i++)
+                    {
+                        var item = _tweenItemsArray[i];
+                        if (item.binding.component != null)
+                        {
+                            item.binding.setter(item.binding.component, item.targetValue);
+#if UNITY_EDITOR
+                            if (!Application.isPlaying && GUI.changed)
+                            {
+                                EditorUtility.SetDirty(item.binding.component);
+                            }
+#endif
+                        }
+                    }
+                    
+                    _isTweening = false;
+                    _tweenCompletionSource?.TrySetResult();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Inline easing calculation to avoid method call overhead and potential allocations
+        /// </summary>
+        private float SampleEasingInline(Ease ease, float time)
+        {
+            var easingsData = GetEffectiveEasingsData();
+            
+            int easeIndex = (int)ease;
+            if (easingsData != null && easingsData.curves != null && 
+                easeIndex >= 0 && easeIndex < easingsData.curves.Length && 
+                easingsData.curves[easeIndex] != null)
+            {
+                return easingsData.curves[easeIndex].Evaluate(time);
+            }
+            
+            // Fallback to default curve generation - cache this to avoid repeated creation
+            return GetOrCreateDefaultCurve(ease).Evaluate(time);
+        }
+
+        // Cache for default curves to avoid repeated creation
+        private static readonly Dictionary<Ease, AnimationCurve> _defaultCurveCache = new Dictionary<Ease, AnimationCurve>();
+
+        /// <summary>
+        /// Get or create a default curve for the given ease, with caching to avoid allocations
+        /// </summary>
+        private AnimationCurve GetOrCreateDefaultCurve(Ease ease)
+        {
+            if (!_defaultCurveCache.TryGetValue(ease, out var curve))
+            {
+                curve = StatefulEasingsData.GetDefaultCurve(ease);
+                _defaultCurveCache[ease] = curve;
+            }
+            return curve;
         }
 
         private void BuildPropertyOverrideCache()
