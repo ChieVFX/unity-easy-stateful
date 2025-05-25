@@ -52,5 +52,7 @@ namespace EasyStateful.Runtime {
         public string defaultBinarySavePath = "StatefulData";
         [Tooltip("Default directory within Assets/ for saving new Animation Clips (e.g., 'Animations/Stateful'). Leave empty for project root.")]
         public string defaultAnimationSavePath = "Animations";
+
+        public StatefulEasingsData easingsData;
     }
 }

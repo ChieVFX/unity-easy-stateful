@@ -16,5 +16,8 @@ namespace EasyStateful.Runtime {
 
         [Tooltip("These rules override global property rules and apply before them.")]
         public List<PropertyOverrideRule> propertyOverrides = new List<PropertyOverrideRule>();
+
+        [Tooltip("Custom easings data for this group.")]
+        public StatefulEasingsData easingsData;
     }
 }
