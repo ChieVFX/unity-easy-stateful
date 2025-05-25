@@ -6,6 +6,8 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using System.Threading.Tasks;
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -127,8 +129,32 @@ namespace EasyStateful.Runtime {
         private bool _isTweening = false;
         private float _tweenStartTime;
         private float _tweenDuration;
-        private bool _tweenCancelled = false;
-        private UniTaskCompletionSource _tweenCompletionSource;
+        private CancellationTokenSource _activeTweenCancellation; // Keep reference to check if cancelled
+        private TaskCompletionSource<bool> _tweenCompletionSource; // Use regular TaskCompletionSource instead
+
+        // Add these fields at class level for string pooling
+        private static readonly Dictionary<string, string> _stringPool = new Dictionary<string, string>();
+        
+        // Pre-allocated collections to avoid repeated allocations
+        private readonly List<Transform> _transformSearchResults = new List<Transform>();
+
+        // Alternative: Completely eliminate async/await
+        private Action _tweenCompletionCallback;
+
+        /// <summary>
+        /// String pooling to reduce allocations from repeated string operations
+        /// </summary>
+        private static string GetPooledString(string str)
+        {
+            if (string.IsNullOrEmpty(str)) return str;
+            
+            if (!_stringPool.TryGetValue(str, out var pooled))
+            {
+                pooled = str;
+                _stringPool[str] = pooled;
+            }
+            return pooled;
+        }
 
         private float GetEffectiveTransitionTime()
         {
@@ -293,10 +319,9 @@ namespace EasyStateful.Runtime {
         }
 
         /// <summary>
-        /// Tween all numeric properties in the given state over time using UniTask.
-        /// Object references will snap instantly.
+        /// Non-async version that uses callbacks instead
         /// </summary>
-        public async UniTask TaskTweenToState(string stateName, float? duration = null, Ease? ease = null, CancellationToken cancellationToken = default)
+        public UniTask TaskTweenToState(string stateName, float? duration = null, Ease? ease = null, CancellationToken cancellationToken = default)
         {
 #if UNITY_EDITOR
             if (!Application.isPlaying)
@@ -309,16 +334,13 @@ namespace EasyStateful.Runtime {
             if (stateMachine == null || stateMachine.states == null)
             {
                 Debug.LogWarning($"State machine not loaded or has no states. Cannot tween to '{stateName}'.", this);
-                return;
+                return UniTask.CompletedTask;
             }
             
             // Cancel any existing tween
             _currentTweenCancellation?.Cancel();
             _currentTweenCancellation?.Dispose();
             _currentTweenCancellation = new CancellationTokenSource();
-            
-            // Use a simpler cancellation approach to reduce allocations
-            var combinedToken = _currentTweenCancellation.Token;
             
             // Find state without LINQ to avoid allocation
             State state = null;
@@ -334,7 +356,7 @@ namespace EasyStateful.Runtime {
             if (state == null)
             {
                 Debug.LogWarning($"State not found: {stateName}", this);
-                return;
+                return UniTask.CompletedTask;
             }
 
             float overallDuration = duration ?? GetEffectiveTransitionTime();
@@ -463,26 +485,34 @@ namespace EasyStateful.Runtime {
 
             // If no properties to tween, we're done
             if (_pooledPropertiesToTween.Count == 0)
-                return;
+                return UniTask.CompletedTask;
 
-            // Convert to array-based approach to avoid foreach allocations
             PrepareArrayBasedTween();
 
-            // Start the unified tween using pure callback approach
-            try
+            // Use a completion source that gets resolved in Update
+            var completionSource = new UniTaskCompletionSource();
+            _tweenCompletionCallback = () => completionSource.TrySetResult();
+            
+            StartTween(overallDuration);
+            
+            return completionSource.Task;
+        }
+
+        private void StartTween(float duration)
+        {
+            _isTweening = true;
+            _tweenDuration = duration;
+            _activeTweenCancellation = _currentTweenCancellation;
+            
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
             {
-                await TweenPropertiesAsync(overallDuration, combinedToken);
+                _tweenStartTime = (float)EditorApplication.timeSinceStartup;
             }
-            catch (OperationCanceledException)
+            else
+#endif
             {
-                // Tween was cancelled, this is expected behavior
-            }
-            finally
-            {
-                _isTweening = false;
-                _tweenCompletionSource = null;
-                _currentTweenCancellation?.Dispose();
-                _currentTweenCancellation = null;
+                _tweenStartTime = Time.time;
             }
         }
 
@@ -511,60 +541,6 @@ namespace EasyStateful.Runtime {
                     ease = item.ease
                 };
             }
-        }
-
-        /// <summary>
-        /// Zero-allocation tweening method using pure callback approach
-        /// </summary>
-        private UniTask TweenPropertiesAsync(float duration, CancellationToken cancellationToken)
-        {
-            if (duration <= 0f)
-            {
-                // Apply final values immediately
-                for (int i = 0; i < _tweenItemsCount; i++)
-                {
-                    var item = _tweenItemsArray[i];
-                    if (item.binding.component != null)
-                    {
-                        item.binding.setter(item.binding.component, item.targetValue);
-#if UNITY_EDITOR
-                        if (!Application.isPlaying && GUI.changed)
-                        {
-                            EditorUtility.SetDirty(item.binding.component);
-                        }
-#endif
-                    }
-                }
-                return UniTask.CompletedTask;
-            }
-
-            // Set up the tween state for Update loop
-            _isTweening = true;
-            _tweenDuration = duration;
-            _tweenCancelled = false;
-            _tweenCompletionSource = new UniTaskCompletionSource();
-            
-            // Register cancellation callback to avoid checking every frame
-            if (cancellationToken.CanBeCanceled)
-            {
-                cancellationToken.Register(() => {
-                    _tweenCancelled = true;
-                });
-            }
-            
-#if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                _tweenStartTime = (float)EditorApplication.timeSinceStartup;
-            }
-            else
-#endif
-            {
-                _tweenStartTime = Time.time;
-            }
-
-            // Return the completion source task - no polling, just pure callback
-            return _tweenCompletionSource.Task;
         }
 
         /// <summary>
@@ -628,32 +604,40 @@ namespace EasyStateful.Runtime {
         /// </summary>
         private PropertyBinding GetOrCreateBinding(Property prop, out Transform target)
         {
-            target = transform.Find(prop.path);
+            // Use pooled strings to reduce allocations
+            string pooledPath = GetPooledString(prop.path);
+            string pooledComponentType = GetPooledString(prop.componentType);
+            string pooledPropertyName = GetPooledString(prop.propertyName);
+            
+            target = transform.Find(pooledPath);
             if (target == null)
             {
-                Debug.LogWarning($"Path not found: {prop.path} for property {prop.propertyName} on component type {prop.componentType}", this);
+                Debug.LogWarning($"Path not found: {pooledPath} for property {pooledPropertyName} on component type {pooledComponentType}", this);
                 return null;
             }
 
-            if (!bindingCache.TryGetValue(prop.path, out var compMap))
+            if (!bindingCache.TryGetValue(pooledPath, out var compMap))
             {
                 compMap = new Dictionary<(string, string), PropertyBinding>();
-                bindingCache[prop.path] = compMap;
+                bindingCache[pooledPath] = compMap;
             }
 
-            var cacheKey = (prop.componentType, prop.propertyName);
+            var cacheKey = (pooledComponentType, pooledPropertyName);
             if (compMap.TryGetValue(cacheKey, out var binding))
             {
                 return binding;
             }
 
-            // Special handling for GameObject.m_IsActive
-            if (prop.propertyName == "m_IsActive" && 
-                (string.IsNullOrEmpty(prop.componentType) || prop.componentType == typeof(GameObject).FullName || prop.componentType == typeof(GameObject).AssemblyQualifiedName))
+            // Special handling for GameObject.m_IsActive - avoid Type.GetType calls
+            if (pooledPropertyName == "m_IsActive" && 
+                (string.IsNullOrEmpty(pooledComponentType) || 
+                 pooledComponentType == "UnityEngine.GameObject" || 
+                 pooledComponentType == typeof(GameObject).FullName || 
+                 pooledComponentType == typeof(GameObject).AssemblyQualifiedName))
             {
                 binding = new PropertyBinding { 
                     targetGameObject = target.gameObject, 
-                    propertyName = prop.propertyName, 
+                    propertyName = pooledPropertyName, 
                     isGameObjectActiveProperty = true 
                 };
                 binding.getter = (_) => binding.targetGameObject.activeSelf ? 1f : 0f;
@@ -661,27 +645,31 @@ namespace EasyStateful.Runtime {
                 return binding;
             }
 
-            // Type caching - avoid string allocations in Type.GetType
-            if (!_typeCache.TryGetValue(prop.componentType, out var compType))
+            // Type caching with better string handling
+            if (!_typeCache.TryGetValue(pooledComponentType, out var compType))
             {
-                compType = Type.GetType(prop.componentType);
+                compType = Type.GetType(pooledComponentType);
                 if (compType != null)
-                    _typeCache[prop.componentType] = compType;
+                    _typeCache[pooledComponentType] = compType;
             }
             if (compType == null)
             {
-                Debug.LogWarning($"Component type not found: {prop.componentType} for path {prop.path}, property {prop.propertyName}", this);
+                Debug.LogWarning($"Component type not found: {pooledComponentType} for path {pooledPath}, property {pooledPropertyName}", this);
                 return null;
             }
 
             var comp = target.GetComponent(compType);
             if (comp == null)
             {
-                Debug.LogWarning($"Component {compType.Name} not found on {prop.path} for property {prop.propertyName}", this);
+                Debug.LogWarning($"Component {compType.Name} not found on {pooledPath} for property {pooledPropertyName}", this);
                 return null;
             }
 
-            binding = new PropertyBinding { component = comp, targetGameObject = target.gameObject, propertyName = prop.propertyName };
+            binding = new PropertyBinding { 
+                component = comp, 
+                targetGameObject = target.gameObject, 
+                propertyName = pooledPropertyName 
+            };
 
             bool isObjectRef = !string.IsNullOrEmpty(prop.objectReference);
 
@@ -699,15 +687,17 @@ namespace EasyStateful.Runtime {
         }
 
         /// <summary>
-        /// Setup object reference binding with caching
+        /// Setup object reference binding with reduced allocations
         /// </summary>
         private void SetupObjectReferenceBinding(PropertyBinding binding, Property prop, Type compType)
         {
-            var memberKey = (compType, prop.propertyName);
+            string pooledPropertyName = GetPooledString(prop.propertyName);
+            
+            var memberKey = (compType, pooledPropertyName);
             if (!_memberInfoCache.TryGetValue(memberKey, out var memberInfo))
             {
-                memberInfo = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo
-                          ?? compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo;
+                memberInfo = compType.GetProperty(pooledPropertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo
+                          ?? compType.GetField(pooledPropertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo;
                 _memberInfoCache[memberKey] = memberInfo;
             }
 
@@ -717,14 +707,14 @@ namespace EasyStateful.Runtime {
             if (pi != null) binding.propInfo = pi;
             else if (fi != null) binding.fieldInfo = fi;
             else {
-                Debug.LogWarning($"Object reference Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}.", this);
+                Debug.LogWarning($"Object reference Property/Field '{pooledPropertyName}' not found on type '{compType.Name}' for path {prop.path}.", this);
                 return; 
             }
 
             Type memberType = pi?.PropertyType ?? fi?.FieldType;
 
             // Use cached compiled expressions
-            var expressionKey = (compType, prop.propertyName, false); // false = setter
+            var expressionKey = (compType, pooledPropertyName, false); // false = setter
             if (_compiledExpressionCache.TryGetValue(expressionKey, out var cachedSetter))
             {
                 binding.setterObj = (Action<Component, UnityEngine.Object>)cachedSetter;
@@ -751,7 +741,7 @@ namespace EasyStateful.Runtime {
                         }
                         catch (Exception ex)
                         {
-                            Debug.LogError($"Failed to compile object setter for Property '{prop.propertyName}' on type '{compType.Name}' (path {prop.path}): {ex.Message}. Will fallback to reflection invoke.", this);
+                            Debug.LogError($"Failed to compile object setter for Property '{pooledPropertyName}' on type '{compType.Name}' (path {prop.path}): {ex.Message}. Will fallback to reflection invoke.", this);
                             binding.setterObj = (c, o) => setterMethod.Invoke(c, new object[] { o }); // Fallback
                         }
                     }
@@ -773,7 +763,7 @@ namespace EasyStateful.Runtime {
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"Failed to compile object setter for Field '{prop.propertyName}' on type '{compType.Name}' (path {prop.path}): {ex.Message}. Will fallback to reflection invoke.", this);
+                        Debug.LogError($"Failed to compile object setter for Field '{pooledPropertyName}' on type '{compType.Name}' (path {prop.path}): {ex.Message}. Will fallback to reflection invoke.", this);
                         binding.setterObj = (c, o) => fi.SetValue(c, o); // Fallback
                     }
                 }
@@ -781,13 +771,15 @@ namespace EasyStateful.Runtime {
         }
 
         /// <summary>
-        /// Setup numeric binding with caching
+        /// Setup numeric binding with reduced allocations
         /// </summary>
         private void SetupNumericBinding(PropertyBinding binding, Property prop, Type compType)
         {
+            string pooledPropertyName = GetPooledString(prop.propertyName);
+            
             // Check for cached compiled expressions first
-            var getterKey = (compType, prop.propertyName, true); // true = getter
-            var setterKey = (compType, prop.propertyName, false); // false = setter
+            var getterKey = (compType, pooledPropertyName, true); // true = getter
+            var setterKey = (compType, pooledPropertyName, false); // false = setter
 
             if (_compiledExpressionCache.TryGetValue(getterKey, out var cachedGetter))
             {
@@ -804,11 +796,11 @@ namespace EasyStateful.Runtime {
                 return;
 
             // Need to compile expressions - do reflection work
-            var memberKey = (compType, prop.propertyName);
+            var memberKey = (compType, pooledPropertyName);
             if (!_memberInfoCache.TryGetValue(memberKey, out var memberInfo))
             {
-                memberInfo = compType.GetProperty(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo
-                          ?? compType.GetField(prop.propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo;
+                memberInfo = compType.GetProperty(pooledPropertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo
+                          ?? compType.GetField(pooledPropertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) as MemberInfo;
                 _memberInfoCache[memberKey] = memberInfo;
             }
 
@@ -820,12 +812,12 @@ namespace EasyStateful.Runtime {
             Expression finalPropertyAccess = null; 
             Type targetPropertyType = null; 
 
-            if (prop.propertyName.Contains("."))
+            if (pooledPropertyName.Contains("."))
             {
                 binding.isSubProperty = true;
-                int dotIdx = prop.propertyName.IndexOf('.');
-                string mainName = prop.propertyName.Substring(0, dotIdx);
-                string subName = prop.propertyName.Substring(dotIdx + 1);
+                int dotIdx = pooledPropertyName.IndexOf('.');
+                string mainName = pooledPropertyName.Substring(0, dotIdx);
+                string subName = pooledPropertyName.Substring(dotIdx + 1);
 
                 binding.mainPropInfo = compType.GetProperty(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 if (binding.mainPropInfo == null) binding.mainFieldInfo = compType.GetField(mainName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -846,7 +838,7 @@ namespace EasyStateful.Runtime {
                     mainMemberAccess = Expression.Field(castComponent, binding.mainFieldInfo);
                     mainMemberType = binding.mainFieldInfo.FieldType;
                 } else {
-                    Debug.LogWarning($"Main member '{mainName}' not found for sub-property '{prop.propertyName}' on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
+                    Debug.LogWarning($"Main member '{mainName}' not found for sub-property '{pooledPropertyName}' on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
                     return;
                 }
                 binding.mainValueType = mainMemberType;
@@ -861,7 +853,7 @@ namespace EasyStateful.Runtime {
                     finalPropertyAccess = Expression.Field(mainMemberAccess, binding.subFieldInfo);
                     targetPropertyType = binding.subFieldInfo.FieldType;
                 } else {
-                    Debug.LogWarning($"Sub member '{subName}' not found on main member '{mainName}' (type: {mainMemberType.Name}) for property '{prop.propertyName}' on path {prop.path}. Cannot create binding.", this);
+                    Debug.LogWarning($"Sub member '{subName}' not found on main member '{mainName}' (type: {mainMemberType.Name}) for property '{pooledPropertyName}' on path {prop.path}. Cannot create binding.", this);
                     return;
                 }
                 binding.subValueType = targetPropertyType;
@@ -878,7 +870,7 @@ namespace EasyStateful.Runtime {
                     finalPropertyAccess = Expression.Field(castComponent, binding.fieldInfo);
                     targetPropertyType = binding.fieldInfo.FieldType;
                 } else {
-                    Debug.LogWarning($"Property/Field '{prop.propertyName}' not found on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
+                    Debug.LogWarning($"Property/Field '{pooledPropertyName}' not found on type '{compType.Name}' for path {prop.path}. Cannot create binding.", this);
                     return;
                 }
                 binding.valueType = targetPropertyType;
@@ -886,7 +878,7 @@ namespace EasyStateful.Runtime {
 
             if (finalPropertyAccess == null || targetPropertyType == null)
             {
-                Debug.LogWarning($"Failed to establish property access for '{prop.propertyName}' on '{compType.Name}' (path {prop.path}). Binding will be incomplete.", this);
+                Debug.LogWarning($"Failed to establish property access for '{pooledPropertyName}' on '{compType.Name}' (path {prop.path}). Binding will be incomplete.", this);
                 return;
             }
 
@@ -915,7 +907,7 @@ namespace EasyStateful.Runtime {
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"Failed to compile getter for {prop.propertyName} on {compType.Name} (path {prop.path}): {ex.Message}. This property may not be readable for tweening.", this);
+                    Debug.LogError($"Failed to compile getter for {pooledPropertyName} on {compType.Name} (path {prop.path}): {ex.Message}. This property may not be readable for tweening.", this);
                     binding.getter = null; 
                 }
             }
@@ -999,7 +991,7 @@ namespace EasyStateful.Runtime {
                     }
                     catch (Exception ex)
                     {
-                         Debug.LogError($"Failed to compile setter for {prop.propertyName} on {compType.Name} (path {prop.path}): {ex.Message}. This property will not be numerically tweenable.", this);
+                         Debug.LogError($"Failed to compile setter for {pooledPropertyName} on {compType.Name} (path {prop.path}): {ex.Message}. This property will not be numerically tweenable.", this);
                          binding.setter = null; 
                     }
                 }
@@ -1108,11 +1100,13 @@ namespace EasyStateful.Runtime {
             // Handle active tween updates
             if (_isTweening)
             {
-                // Check cancellation without throwing exceptions
-                if (_tweenCancelled)
+                // Check cancellation by comparing token source references (no allocations)
+                if (_activeTweenCancellation != _currentTweenCancellation || 
+                    (_activeTweenCancellation != null && _activeTweenCancellation.IsCancellationRequested))
                 {
                     _isTweening = false;
-                    _tweenCompletionSource?.TrySetCanceled();
+                    _tweenCompletionCallback?.Invoke();
+                    _tweenCompletionCallback = null;
                     return;
                 }
 
@@ -1171,7 +1165,8 @@ namespace EasyStateful.Runtime {
                     }
                     
                     _isTweening = false;
-                    _tweenCompletionSource?.TrySetResult();
+                    _tweenCompletionCallback?.Invoke();
+                    _tweenCompletionCallback = null;
                 }
             }
         }
