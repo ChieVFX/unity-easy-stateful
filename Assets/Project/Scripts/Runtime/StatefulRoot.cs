@@ -320,17 +320,13 @@ namespace EasyStateful.Runtime {
             {
                 var prop = state.properties[propIndex];
                 
-#if UNITY_EDITOR
-                bool inEditor = !Application.isPlaying;
-#else
-                const bool inEditor = false;
-#endif
-
                 float finalPropDuration;
                 Ease finalPropEase;
                 bool handledBySpecialRule = false;
                 bool instantEnableDelayedDisable = false;
 
+#if UNITY_EDITOR
+                bool inEditor = !Application.isPlaying;
                 if (inEditor)
                 {
                     // Always resolve transition info live in editor
@@ -351,6 +347,7 @@ namespace EasyStateful.Runtime {
                     }
                 }
                 else
+#endif
                 {
                     // Use cached info in play mode
                     if (!_propertyTransitionCache.TryGetValue(prop, out PropertyTransitionInfo info))
@@ -564,39 +561,6 @@ namespace EasyStateful.Runtime {
             }
         }
 
-        [ContextMenu("Update State Names Array")]
-        #endif
-        public void UpdateStateNamesArray()
-        {
-            if (stateMachine != null && stateMachine.states != null)
-                stateNames = stateMachine.states.Select(s => s.name).ToArray();
-            else
-                stateNames = new string[0];
-            
-            #if UNITY_EDITOR
-            if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(this);
-            #endif
-        }
-
-        #if UNITY_EDITOR
-        public void UpdateStateNamesFromClip(AnimationClip clip)
-        {
-            if (clip != null)
-            {
-                var events = AnimationUtility.GetAnimationEvents(clip);
-                stateNames = events
-                    .Select(ev => !string.IsNullOrEmpty(ev.functionName) ? ev.functionName : ev.stringParameter)
-                    .Where(name => !string.IsNullOrEmpty(name))
-                    .Distinct()
-                    .ToArray();
-            }
-            else
-            {
-                stateNames = new string[0];
-            }
-            if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(this);
-        }
-
         /// <summary>
         /// Public method for editor to manually update tweens
         /// </summary>
@@ -781,6 +745,21 @@ namespace EasyStateful.Runtime {
                     };
                 }
             }
+        }
+
+        #if UNITY_EDITOR
+        [ContextMenu("Update State Names Array")]
+        #endif
+        public void UpdateStateNamesArray()
+        {
+            if (stateMachine != null && stateMachine.states != null)
+                stateNames = stateMachine.states.Select(s => s.name).ToArray();
+            else
+                stateNames = new string[0];
+            
+            #if UNITY_EDITOR
+            if (!Application.isPlaying && GUI.changed) EditorUtility.SetDirty(this);
+            #endif
         }
     }
 }
