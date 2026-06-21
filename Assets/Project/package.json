@@ -27,6 +27,11 @@
             "path": "Samples~/Basic"
         },
         {
+            "displayName": "Showcase",
+            "description": "A small living UI built from StatefulRoot widgets — a segmented control with a sliding highlight and a morphing hero, an animated toggle, an expand/collapse card, a slide-in drawer and toast, plus custom uGUI shaders — all driven by button clicks via TweenToState. Shows how to build beautiful, animated UI with just states and one method call.",
+            "path": "Samples/Showcase"
+        },
+        {
             "displayName": "Performance Lab",
             "description": "A polished control window that spawns an adjustable swarm of StatefulRoot objects and fires simultaneous state transitions through them, with live FPS / frame-time readouts so you can measure how the tween engine scales.",
             "path": "Samples/PerformanceLab"
