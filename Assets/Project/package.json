@@ -25,6 +25,11 @@
             "displayName": "Basic Example",
             "description": "Basic example showing easy stateful functionality in action",
             "path": "Samples~/Basic"
+        },
+        {
+            "displayName": "Performance Lab",
+            "description": "A polished control window that spawns an adjustable swarm of StatefulRoot objects and fires simultaneous state transitions through them, with live FPS / frame-time readouts so you can measure how the tween engine scales.",
+            "path": "Samples/PerformanceLab"
         }
     ]
 }
