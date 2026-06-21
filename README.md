@@ -104,6 +104,15 @@ Example use-cases(that are created by default in Global Settings):
 
 Define these rules globally or in group-level settings.
 
+### 3. Debug Scrubbing (`debugPause`)
+
+Every `StatefulRoot` exposes a `debugPause` field (also a slider in the inspector):
+
+* **Negative** (default `-1`) → normal playback.
+* **`0`–`1`** → freezes any active transition at that normalized progress.
+
+Fire a transition with `TweenToState(...)`, then scrub `debugPause` to hold it mid-way — e.g. `0.25` to inspect it a quarter of the way through, or `0.5` for the halfway pose. Set it back below `0` to resume. Handy for fine-tuning a look, design review, and deterministic QA screenshots.
+
 ---
 
 ## 🎹 Work Mode Hotkeys

@@ -302,6 +302,11 @@ namespace EasyStateful.Runtime
             float elapsedTime = currentTime - _tweenStartTime;
             float normalizedTime = Mathf.Clamp01(elapsedTime / _tweenDuration);
 
+            // Debug scrub: when StatefulRoot.debugPause is in [0,1], hold the transition at that
+            // fixed fraction and don't auto-complete. Set it back to negative to resume normal playback.
+            bool debugHeld = root != null && root.debugPause >= 0f;
+            if (debugHeld) normalizedTime = Mathf.Clamp01(root.debugPause);
+
             // Update all properties with their respective easings and custom timing
             for (int i = 0; i < _tweenItemsCount; i++)
             {
@@ -323,8 +328,8 @@ namespace EasyStateful.Runtime
                 }
             }
 
-            // Check if tween is complete
-            if (normalizedTime >= 1f)
+            // Check if tween is complete (never auto-completes while debug-held)
+            if (!debugHeld && normalizedTime >= 1f)
             {
                 // Ensure final values are set
                 for (int i = 0; i < _tweenItemsCount; i++)

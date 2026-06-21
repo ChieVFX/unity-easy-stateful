@@ -27,6 +27,11 @@ namespace EasyStateful.Runtime {
         public bool overrideDefaultEase = false;
         public Ease customDefaultEase = Ease.Linear;
 
+        [Header("Debug")]
+        [Tooltip("Scrub/hold an active transition at a fixed normalized progress (0 = start, 1 = end). " +
+                 "Negative = off (normal playback). Handy for inspecting a state mid-transition or for QA.")]
+        [Range(-1f, 1f)] public float debugPause = -1f;
+
         // Managers
         private PropertyBindingManager bindingManager;
         private StatefulSettingsResolver settingsResolver;
