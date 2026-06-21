@@ -21,8 +21,10 @@ namespace EasyStateful.Samples.Showcase
         readonly List<StatefulRoot> _easeDots = new List<StatefulRoot>();
         bool _easeAtEnd;
 
-        const float EaseStartX = 16f;
-        const float EaseEndX = 540f;
+        const float KnobR = 13f;                  // knob radius (knob is 26px)
+        const float TrackW = 566f;                // guide length
+        const float EaseStartX = KnobR;           // knob start centre — left edge flush with the track start
+        const float EaseEndX = TrackW - KnobR;    // knob end centre   — right edge flush with the track end
 
         void BuildMotionPage(RectTransform page)
         {
@@ -31,21 +33,22 @@ namespace EasyStateful.Samples.Showcase
             for (int i = 0; i < EaseRows.Length; i++)
             {
                 float rowY = -50 - i * 58;
+                float trackY = rowY - 12;   // one shared centre line for the label, guide, marker and knob
                 // colour lives on the label, so the moving tiles stay identical (not slider-like)
                 var name = UI.Label($"N{i}", card, EaseRows[i].name, 14, Palette.Hex(EaseRows[i].hex), TextAlignmentOptions.Left, FontStyles.Bold);
-                UI.At(name.rectTransform, 20, rowY, 120, 24, new Vector2(0, 1), new Vector2(0, 1));
+                UI.At(name.rectTransform, 20, trackY, 120, 24, new Vector2(0, 1), new Vector2(0, 0.5f));
 
-                // faint guide showing the travel path + a start/end marker (not a filled slider track)
+                // faint guide (travel path) + an end marker the knob lands on — all centred on trackY
                 var guide = UI.Panel($"Guide{i}", card, new Color(1, 1, 1, 0.05f), rounded: false);
-                UI.At(guide.rectTransform, 150, rowY - 19, EaseEndX + 26, 2, new Vector2(0, 1), new Vector2(0, 1));
+                UI.At(guide.rectTransform, 150, trackY, TrackW, 2, new Vector2(0, 1), new Vector2(0, 0.5f));
                 guide.raycastTarget = false;
                 var endm = UI.Panel($"End{i}", card, new Color(1, 1, 1, 0.12f), circle: true);
-                UI.At(endm.rectTransform, 150 + EaseEndX + 13, rowY - 18, 9, 9, new Vector2(0, 1), new Vector2(0.5f, 0.5f));
+                UI.At(endm.rectTransform, 150 + EaseEndX, trackY, 9, 9, new Vector2(0, 1), new Vector2(0.5f, 0.5f));
                 endm.raycastTarget = false;
 
-                // the travelling tile — its own StatefulRoot so each gets its own ease
+                // the travelling knob — its own StatefulRoot so each gets its own ease
                 var holder = UI.Rect($"Lane{i}", card);
-                UI.At(holder, 150, rowY - 6, EaseEndX + 40, 36, new Vector2(0, 1), new Vector2(0, 1));
+                UI.At(holder, 150, trackY, TrackW, 36, new Vector2(0, 1), new Vector2(0, 0.5f));
                 var tile = UI.Panel("Tile", holder, Palette.Accent);
                 UI.At(tile.rectTransform, EaseStartX, 0, 26, 26, new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f));
                 tile.raycastTarget = false;

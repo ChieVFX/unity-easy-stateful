@@ -139,7 +139,10 @@ namespace EasyStateful.Samples.Showcase
 
         void BuildRail(Transform window)
         {
-            var rail = UI.Panel("Rail", window, Palette.PanelAlt);
+            // Rail rounded on the LEFT only (to meet the window's rounded left corners); its right
+            // edge is a straight divider against the content, not a rounded 9-slice.
+            var rail = UI.Panel("Rail", window, Palette.PanelAlt, rounded: false);
+            rail.sprite = UI.RoundedRectLeft((int)RAIL_W, (int)WIN_H, 16f);
             rail.rectTransform.anchorMin = new Vector2(0, 0); rail.rectTransform.anchorMax = new Vector2(0, 1);
             rail.rectTransform.pivot = new Vector2(0, 0.5f); rail.rectTransform.sizeDelta = new Vector2(RAIL_W, 0);
             rail.rectTransform.anchoredPosition = Vector2.zero;
