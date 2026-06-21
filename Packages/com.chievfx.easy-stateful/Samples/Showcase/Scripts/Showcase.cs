@@ -531,7 +531,7 @@ namespace EasyStateful.Samples.Showcase
 
         Canvas EnsureCanvas()
         {
-            var canvas = FindObjectOfType<Canvas>();
+            var canvas = FindFirstObjectByType<Canvas>();
             if (canvas == null)
             {
                 var go = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -542,7 +542,7 @@ namespace EasyStateful.Samples.Showcase
                 scaler.referenceResolution = new Vector2(1920, 1080);
                 scaler.matchWidthOrHeight = 0.5f;
             }
-            if (FindObjectOfType<EventSystem>() == null)
+            if (FindFirstObjectByType<EventSystem>() == null)
             {
                 var es = new GameObject("EventSystem", typeof(EventSystem));
                 es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();

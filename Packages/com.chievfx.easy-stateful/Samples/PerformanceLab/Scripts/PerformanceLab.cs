@@ -264,7 +264,7 @@ namespace EasyStateful.Samples.PerformanceLab
         Canvas EnsureCanvas()
         {
             var canvas = GetComponentInParent<Canvas>();
-            if (canvas == null) canvas = FindObjectOfType<Canvas>();
+            if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
             if (canvas == null)
             {
                 var go = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -276,7 +276,7 @@ namespace EasyStateful.Samples.PerformanceLab
                 scaler.matchWidthOrHeight = 0.5f;
             }
 
-            if (FindObjectOfType<EventSystem>() == null)
+            if (FindFirstObjectByType<EventSystem>() == null)
             {
                 var es = new GameObject("EventSystem", typeof(EventSystem));
                 // New Input System backend.

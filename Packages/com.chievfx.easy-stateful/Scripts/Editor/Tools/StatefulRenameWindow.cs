@@ -242,7 +242,7 @@ namespace EasyStateful.Editor
             // that might reference this object's path
             if (relatedStatefulRoots.Count == 0)
             {
-                var allRoots = FindObjectsOfType<StatefulRoot>();
+                var allRoots = FindObjectsByType<StatefulRoot>();
                 foreach (var root in allRoots)
                 {
                     if (CouldRootReferenceObject(root, targetObject))

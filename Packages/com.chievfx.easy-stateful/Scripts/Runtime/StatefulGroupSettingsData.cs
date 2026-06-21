@@ -27,7 +27,7 @@ namespace EasyStateful.Runtime {
         private void OnValidate()
         {
             // Find all StatefulRoots that use this group settings and invalidate their caches
-            var allRoots = FindObjectsOfType<StatefulRoot>();
+            var allRoots = FindObjectsByType<StatefulRoot>();
             foreach (var root in allRoots)
             {
                 if (root.groupSettings == this)
