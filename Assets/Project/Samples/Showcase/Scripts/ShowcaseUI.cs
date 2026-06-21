@@ -45,8 +45,11 @@ namespace EasyStateful.Samples.Showcase
     /// <summary>Immediate helpers to assemble a clean, rounded uGUI hierarchy from code.</summary>
     public static class UI
     {
-        static Sprite _round, _circle, _triangle, _star, _check;
+        static Sprite _round, _circle, _triangle, _star, _check, _bar;
         public static Sprite Check => _check != null ? _check : (_check = MakeCheck(48));
+        /// <summary>Subtly-rounded 9-slice bar (small radius) for thin tracks/fills that would look
+        /// like over-rounded pills with the default <see cref="Round"/> sprite.</summary>
+        public static Sprite Bar => _bar != null ? _bar : (_bar = MakeRounded(32, 5f));
 
         /// <summary>9-sliced rounded-rect sprite (border = radius), generated procedurally.</summary>
         public static Sprite Round => _round != null ? _round : (_round = MakeRounded(48, 16f));

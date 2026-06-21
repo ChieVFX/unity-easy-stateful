@@ -14,7 +14,7 @@ namespace EasyStateful.Samples.Showcase
 
         StatefulRoot _progress; bool _progressFull;
         Image _progressFill; TextMeshProUGUI _progressPct;
-        const float ProgTrackW = 470f;
+        const float ProgTrackW = 400f;
 
         StatefulRoot _skeleton; bool _loaded;
 
@@ -32,20 +32,21 @@ namespace EasyStateful.Samples.Showcase
             UI.Stretch(root);
             _progress = root.gameObject.AddComponent<StatefulRoot>();
 
-            // top row: percentage (caption is drawn by PageCard, top-left)
-            _progressPct = UI.Label("Pct", root, "0%", 24, Palette.Text, TextAlignmentOptions.Right, FontStyles.Bold);
-            UI.At(_progressPct.rectTransform, -22, -12, 140, 32, new Vector2(1, 1), new Vector2(1, 1));
-
-            // middle row: track on the left, Run on the right (same line — no dead space)
+            // single body row (below the 34px header): [ track ] [ % ] [ Run ], all centred at y -75
             var track = UI.Panel("Track", root, Palette.Track);
-            UI.At(track.rectTransform, 24, -66, ProgTrackW, 16, new Vector2(0, 1), new Vector2(0, 1));
+            track.sprite = UI.Bar; // flat-ish bar, not an over-rounded pill
+            UI.At(track.rectTransform, 24, -67, ProgTrackW, 16, new Vector2(0, 1), new Vector2(0, 1));
             track.raycastTarget = false;
             _progressFill = UI.Panel("Fill", root, Palette.Accent);
-            UI.At(_progressFill.rectTransform, 24, -66, 0, 16, new Vector2(0, 1), new Vector2(0, 1));
+            _progressFill.sprite = UI.Bar;
+            UI.At(_progressFill.rectTransform, 24, -67, 0, 16, new Vector2(0, 1), new Vector2(0, 1));
             _progressFill.raycastTarget = false;
 
+            _progressPct = UI.Label("Pct", root, "0%", 24, Palette.Text, TextAlignmentOptions.Right, FontStyles.Bold);
+            UI.At(_progressPct.rectTransform, -180, -59, 120, 32, new Vector2(1, 1), new Vector2(1, 1));
+
             var run = UI.Panel("Run", root, Palette.Accent);
-            UI.At(run.rectTransform, -22, -52, 150, 44, new Vector2(1, 1), new Vector2(1, 1));
+            UI.At(run.rectTransform, -24, -53, 148, 44, new Vector2(1, 1), new Vector2(1, 1));
             UI.MakeButton(run, RunProgress);
             var rl = UI.Label("L", run.transform, "Run", 15, Palette.Hex("#0D1117"), TextAlignmentOptions.Center, FontStyles.Bold);
             UI.Stretch(rl.rectTransform);
@@ -80,18 +81,26 @@ namespace EasyStateful.Samples.Showcase
             var bAvatar = UI.Panel("BoneAvatar", bones, Palette.Track, circle: true);
             UI.At(bAvatar.rectTransform, 28, -50, 54, 54, new Vector2(0, 1), new Vector2(0, 1));
             TuneSkeletonShimmer(bAvatar);
-            float[] widths = { 360, 300, 220 };
+            const float BoneW = 460f; // uniform line length — bar lengths shouldn't pretend to map to real text
             for (int i = 0; i < 3; i++)
             {
                 var bar = UI.Panel($"Bone{i}", bones, Palette.Track);
-                UI.At(bar.rectTransform, 102, -44 - i * 28, widths[i], 16, new Vector2(0, 1), new Vector2(0, 1));
-                bar.sprite = UI.RoundedRect((int)widths[i], 16, 8); // crisp pill at the bar's own size (shimmer forces Simple)
+                UI.At(bar.rectTransform, 102, -44 - i * 28, BoneW, 16, new Vector2(0, 1), new Vector2(0, 1));
+                bar.sprite = UI.RoundedRect((int)BoneW, 16, 8); // crisp pill at the bar's own size (shimmer forces Simple)
                 TuneSkeletonShimmer(bar);
             }
 
-            // loaded content
-            var loaded = UI.Rect("Loaded", root);
-            UI.At(loaded, 0, 0, 740, 150);
+            // loaded content — inside a right-anchored mask that widens to materialize it right→left
+            var loadedMask = UI.Rect("LoadedMask", root);
+            loadedMask.anchorMin = new Vector2(1, 0); loadedMask.anchorMax = new Vector2(1, 1);
+            loadedMask.pivot = new Vector2(1, 0.5f);
+            loadedMask.sizeDelta = new Vector2(740, 0); loadedMask.anchoredPosition = Vector2.zero;
+            loadedMask.gameObject.AddComponent<RectMask2D>();
+
+            var loaded = UI.Rect("Loaded", loadedMask);
+            loaded.anchorMin = new Vector2(1, 0); loaded.anchorMax = new Vector2(1, 1);
+            loaded.pivot = new Vector2(1, 0.5f);
+            loaded.sizeDelta = new Vector2(740, 0); loaded.anchoredPosition = Vector2.zero;
             loaded.gameObject.AddComponent<CanvasGroup>();
             var av = UI.Panel("Avatar", loaded, Palette.Purple, circle: true);
             UI.At(av.rectTransform, 28, -50, 54, 54, new Vector2(0, 1), new Vector2(0, 1));
@@ -99,8 +108,8 @@ namespace EasyStateful.Samples.Showcase
             UI.At(name.rectTransform, 102, -44, 360, 26, new Vector2(0, 1), new Vector2(0, 1));
             var role = UI.Label("Role", loaded, "Engineer · online now", 15, Palette.Green, TextAlignmentOptions.Left);
             UI.At(role.rectTransform, 102, -74, 360, 22, new Vector2(0, 1), new Vector2(0, 1));
-            var blurb = UI.Label("Blurb", loaded, "Crossfaded in by tweening two CanvasGroups.", 13, Palette.TextDim, TextAlignmentOptions.Left);
-            UI.At(blurb.rectTransform, 102, -100, 520, 20, new Vector2(0, 1), new Vector2(0, 1));
+            var blurb = UI.Label("Blurb", loaded, "Materialized right→left with an animated mask — no transform offset.", 13, Palette.TextDim, TextAlignmentOptions.Left);
+            UI.At(blurb.rectTransform, 102, -100, 560, 20, new Vector2(0, 1), new Vector2(0, 1));
 
             var btn = UI.Panel("Load", root, Palette.Track);
             UI.At(btn.rectTransform, -24, 18, 150, 40, new Vector2(1, 0), new Vector2(1, 0));
@@ -111,13 +120,13 @@ namespace EasyStateful.Samples.Showcase
             _skeleton.statefulDataAsset = Data(new List<State>
             {
                 St("Loading",
-                    P("Bones", CANVASGROUP, "alpha",1f),
-                    P("Loaded", CANVASGROUP, "alpha",0f),
-                    P("Loaded", TRANSFORM, "m_LocalScale.x", 0.97f), P("Loaded", TRANSFORM, "m_LocalScale.y", 0.97f)),
+                    P("Bones", CANVASGROUP, "alpha", 1f),
+                    P("LoadedMask/Loaded", CANVASGROUP, "alpha", 0f),
+                    P("LoadedMask", RECT, "m_SizeDelta.x", 0f)),
                 St("Done",
-                    P("Bones", CANVASGROUP, "alpha",0f),
-                    P("Loaded", CANVASGROUP, "alpha",1f),
-                    P("Loaded", TRANSFORM, "m_LocalScale.x", 1f), P("Loaded", TRANSFORM, "m_LocalScale.y", 1f)),
+                    P("Bones", CANVASGROUP, "alpha", 0f),
+                    P("LoadedMask/Loaded", CANVASGROUP, "alpha", 1f),
+                    P("LoadedMask", RECT, "m_SizeDelta.x", 740f)),
             });
             _skeleton.LoadFromAsset(_skeleton.statefulDataAsset);
             _skeleton.SnapToState("Loading");
@@ -136,7 +145,7 @@ namespace EasyStateful.Samples.Showcase
         void ToggleSkeleton()
         {
             _loaded = !_loaded;
-            _skeleton.TweenToState(_loaded ? "Done" : "Loading", 0.45f, Ease.OutCubic);
+            _skeleton.TweenToState(_loaded ? "Done" : "Loading", 0.55f, Ease.OutCubic);
         }
 
         // ---------------- shader tiles ----------------

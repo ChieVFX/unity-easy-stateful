@@ -316,6 +316,7 @@ namespace EasyStateful.Samples.Showcase
 
             var dialog = UI.Panel("Dialog", root, Palette.Panel);
             UI.At(dialog.rectTransform, 0, 0, 380, 200);
+            dialog.gameObject.AddComponent<CanvasGroup>();
             var o = dialog.gameObject.AddComponent<Outline>();
             o.effectColor = Palette.Border; o.effectDistance = new Vector2(1, -1);
 
@@ -340,11 +341,11 @@ namespace EasyStateful.Samples.Showcase
             {
                 St("Closed",
                     P("Scrim", "", "m_IsActive", 0f), P("Scrim", IMAGE, "m_Color.a", 0f),
-                    P("Dialog", "", "m_IsActive", 0f),
-                    P("Dialog", TRANSFORM, "m_LocalScale.x", 0.9f), P("Dialog", TRANSFORM, "m_LocalScale.y", 0.9f)),
+                    P("Dialog", "", "m_IsActive", 0f), P("Dialog", CANVASGROUP, "alpha", 0f),
+                    P("Dialog", TRANSFORM, "m_LocalScale.x", 0.92f), P("Dialog", TRANSFORM, "m_LocalScale.y", 0.92f)),
                 St("Open",
                     P("Scrim", "", "m_IsActive", 1f), P("Scrim", IMAGE, "m_Color.a", 0.6f),
-                    P("Dialog", "", "m_IsActive", 1f),
+                    P("Dialog", "", "m_IsActive", 1f), P("Dialog", CANVASGROUP, "alpha", 1f),
                     P("Dialog", TRANSFORM, "m_LocalScale.x", 1f), P("Dialog", TRANSFORM, "m_LocalScale.y", 1f)),
             });
             _modal.LoadFromAsset(_modal.statefulDataAsset);
@@ -352,8 +353,10 @@ namespace EasyStateful.Samples.Showcase
             SetEase(_modal, Ease.OutBack);
         }
 
-        void OpenModal() { _modalOpen = true; _modal.TweenToState("Open", 0.26f, Ease.OutBack); }
-        void CloseModal() { if (!_modalOpen) return; _modalOpen = false; _modal.TweenToState("Closed", 0.2f, Ease.InCubic); }
+        // NOTE: per-call ease is baked over by the property cache, so we pick the ease via SetEase
+        // before each transition — OutBack to pop open, OutCubic to fade/shrink shut without overshoot.
+        void OpenModal() { _modalOpen = true; SetEase(_modal, Ease.OutBack); _modal.TweenToState("Open", 0.3f); }
+        void CloseModal() { if (!_modalOpen) return; _modalOpen = false; SetEase(_modal, Ease.OutCubic); _modal.TweenToState("Closed", 0.2f); }
 
         // ============================================================ drawer
         void BuildDrawer(Transform parent)
@@ -437,6 +440,8 @@ namespace EasyStateful.Samples.Showcase
             var o = toast.gameObject.AddComponent<Outline>();
             o.effectColor = new Color(0.30f, 0.64f, 1f, 0.5f); o.effectDistance = new Vector2(1, -1);
             _toast = toast.gameObject.AddComponent<StatefulRoot>();
+            var tcg = toast.gameObject.AddComponent<CanvasGroup>(); // fade bg + dot + label together
+            tcg.blocksRaycasts = false;
 
             var dot = UI.Panel("Dot", toast.transform, Palette.Accent, circle: true);
             UI.At(dot.rectTransform, 22, 0, 12, 12);
@@ -446,10 +451,10 @@ namespace EasyStateful.Samples.Showcase
 
             _toast.statefulDataAsset = Data(new List<State>
             {
-                St("Hidden", P("", "", "m_IsActive", 0f), P("", IMAGE, "m_Color.a", 0f),
-                    P("", RECT, "m_AnchoredPosition.y", 40f)),
-                St("Shown", P("", "", "m_IsActive", 1f), P("", IMAGE, "m_Color.a", 1f),
-                    P("", RECT, "m_AnchoredPosition.y", 78f)),
+                St("Hidden", P("", "", "m_IsActive", 0f), P("", CANVASGROUP, "alpha", 0f),
+                    P("", RECT, "m_AnchoredPosition.y", 36f)),
+                St("Shown", P("", "", "m_IsActive", 1f), P("", CANVASGROUP, "alpha", 1f),
+                    P("", RECT, "m_AnchoredPosition.y", 86f)),
             });
             _toast.LoadFromAsset(_toast.statefulDataAsset);
             _toast.SnapToState("Hidden");
@@ -461,7 +466,8 @@ namespace EasyStateful.Samples.Showcase
             _toastLabel.text = text;
             _toastShown = true;
             _toastHideAt = Time.time + 1.9f;
-            _toast.TweenToState("Shown", 0.3f, Ease.OutBack);
+            SetEase(_toast, Ease.OutBack);           // pop up
+            _toast.TweenToState("Shown", 0.34f);
         }
 
         void Update()
@@ -469,7 +475,8 @@ namespace EasyStateful.Samples.Showcase
             if (_toastShown && Time.time >= _toastHideAt)
             {
                 _toastShown = false;
-                _toast.TweenToState("Hidden", 0.3f, Ease.InCubic);
+                SetEase(_toast, Ease.OutCubic);       // slide down + fade, no overshoot
+                _toast.TweenToState("Hidden", 0.3f);
             }
             PageUpdate();
         }
