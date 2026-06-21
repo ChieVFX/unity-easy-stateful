@@ -10,8 +10,9 @@ Shader "EasyStateful/UIAurora"
         _ColorA ("Color A", Color) = (0.05,0.07,0.11,1)
         _ColorB ("Color B", Color) = (0.10,0.24,0.48,1)
         _ColorC ("Color C", Color) = (0.36,0.16,0.52,1)
-        _Speed ("Speed", Float) = 0.12
-        _Scale ("Scale", Float) = 2.2
+        _Speed ("Speed", Float) = 0.5
+        _Scale ("Scale", Float) = 3.0
+        _AnimTime ("Anim Time", Float) = 0
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -46,7 +47,7 @@ Shader "EasyStateful/UIAurora"
 
             fixed4 _Color, _TextureSampleAdd; float4 _ClipRect;
             sampler2D _MainTex; float4 _MainTex_ST;
-            fixed4 _ColorA, _ColorB, _ColorC; float _Speed, _Scale;
+            fixed4 _ColorA, _ColorB, _ColorC; float _Speed, _Scale, _AnimTime;
 
             v2f vert(appdata_t v)
             {
@@ -61,7 +62,7 @@ Shader "EasyStateful/UIAurora"
             fixed4 frag(v2f IN) : SV_Target
             {
                 float2 uv = IN.texcoord;
-                float t = _Time.y * _Speed;
+                float t = _AnimTime * _Speed;
                 float w1 = sin(uv.x * _Scale + t) * 0.5 + 0.5;
                 float w2 = sin(uv.y * _Scale * 1.3 - t * 1.2 + uv.x * 2.0) * 0.5 + 0.5;
                 float w3 = sin((uv.x + uv.y) * _Scale * 0.8 + t * 0.7) * 0.5 + 0.5;

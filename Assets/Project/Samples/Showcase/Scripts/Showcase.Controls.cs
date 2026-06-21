@@ -66,8 +66,7 @@ namespace EasyStateful.Samples.Showcase
             // morphing emblem on the right
             var emblem = UI.Panel("Emblem", root, Palette.Accent);
             UI.At(emblem.rectTransform, -58, -62, 78, 78, new Vector2(1, 1), new Vector2(0.5f, 0.5f));
-            var shim = Mat("EasyStateful/UIShimmer");
-            if (shim != null) emblem.material = shim;
+            ApplyMat(emblem, "EasyStateful/UIShimmer");
             var pip = UI.Panel("Pip", emblem.transform, new Color(1, 1, 1, 0.9f), circle: true);
             UI.At(pip.rectTransform, 20, 20, 16, 16); pip.raycastTarget = false;
 
@@ -83,11 +82,12 @@ namespace EasyStateful.Samples.Showcase
                     P("Bar/Highlight", IMAGE, "m_Color.r", c.r), P("Bar/Highlight", IMAGE, "m_Color.g", c.g), P("Bar/Highlight", IMAGE, "m_Color.b", c.b),
                     P("Emblem", IMAGE, "m_Color.r", c.r), P("Emblem", IMAGE, "m_Color.g", c.g), P("Emblem", IMAGE, "m_Color.b", c.b),
                     P("Emblem", TRANSFORM, "m_LocalScale.x", 0.84f + i * 0.12f), P("Emblem", TRANSFORM, "m_LocalScale.y", 0.84f + i * 0.12f),
-                    P("Emblem", TRANSFORM, "localEulerAngles.z", i * 120f)));
+                    P("Emblem", TRANSFORM, "localEulerAngles.z", i * 90f)));
             }
             _seg.statefulDataAsset = Data(states);
             _seg.LoadFromAsset(_seg.statefulDataAsset);
             _seg.SnapToState("Seg0");
+            SetEase(_seg, Ease.OutCubic);
             SelectSeg(0, true);
         }
 
@@ -124,6 +124,7 @@ namespace EasyStateful.Samples.Showcase
             });
             _ctlToggle.LoadFromAsset(_ctlToggle.statefulDataAsset);
             _ctlToggle.SnapToState("Off");
+            SetEase(_ctlToggle, Ease.OutBack);
         }
 
         void ToggleWifi()
@@ -158,6 +159,7 @@ namespace EasyStateful.Samples.Showcase
             });
             _check.LoadFromAsset(_check.statefulDataAsset);
             _check.SnapToState("Off");
+            SetEase(_check, Ease.OutBack);
         }
 
         void ToggleCheck()
@@ -203,6 +205,7 @@ namespace EasyStateful.Samples.Showcase
             _stars.LoadFromAsset(_stars.statefulDataAsset);
             _stars.SnapToState($"R{_rating}");
             _stars.currentStateIndex = _rating; // states are R0..R5 in order
+            SetEase(_stars, Ease.OutBack);
         }
 
         void SetRating(int r)
@@ -242,6 +245,7 @@ namespace EasyStateful.Samples.Showcase
             _stepper.LoadFromAsset(_stepper.statefulDataAsset);
             _stepper.SnapToState("Rest");
             _stepper.currentStateIndex = 1; // Rest
+            SetEase(_stepper, Ease.OutBack);
         }
 
         void Step(int d)

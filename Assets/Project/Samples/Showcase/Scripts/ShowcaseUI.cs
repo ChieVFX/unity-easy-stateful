@@ -4,6 +4,23 @@ using TMPro;
 
 namespace EasyStateful.Samples.Showcase
 {
+    /// <summary>
+    /// Feeds the current time into a UI material's <c>_AnimTime</c> uniform every frame.
+    /// uGUI doesn't reliably re-evaluate <c>_Time</c> on a static canvas, so the custom
+    /// shaders read <c>_AnimTime</c> instead and we drive it from here.
+    /// </summary>
+    public class ShaderTime : MonoBehaviour
+    {
+        static readonly int ID = Shader.PropertyToID("_AnimTime");
+        Graphic _g;
+        void Awake() { _g = GetComponent<Graphic>(); }
+        void Update()
+        {
+            var m = _g != null ? _g.material : null;
+            if (m != null) m.SetFloat(ID, Time.unscaledTime);
+        }
+    }
+
     /// <summary>Shared color palette for the showcase.</summary>
     public static class Palette
     {

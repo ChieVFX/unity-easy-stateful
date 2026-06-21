@@ -6,21 +6,23 @@ using EasyStateful.Runtime;
 
 namespace EasyStateful.Samples.Showcase
 {
-    // Effects page — progress bar, a skeleton→content loader, and tiles showing
-    // the two custom uGUI shaders.
+    // Effects page — progress bar, a skeleton→content loader (crossfade), and tiles
+    // showing the two custom uGUI shaders.
     public partial class Showcase
     {
+        const string CANVASGROUP = "UnityEngine.CanvasGroup, UnityEngine.UIModule";
+
         StatefulRoot _progress; bool _progressFull;
         Image _progressFill; TextMeshProUGUI _progressPct;
-        const float ProgTrackW = 300f;
+        const float ProgTrackW = 680f;
 
         StatefulRoot _skeleton; bool _loaded;
 
         void BuildEffectsPage(RectTransform page)
         {
-            BuildProgressCard(PageCard(page, 30, -22, 355, 150, "PROGRESS").transform);
-            BuildSkeletonCard(PageCard(page, 405, -22, 365, 150, "SKELETON LOADER").transform);
-            BuildShaderTiles(PageCard(page, 30, -188, 740, 300, "CUSTOM uGUI SHADERS").transform);
+            BuildProgressCard(PageCard(page, 30, -22, 740, 168, "PROGRESS").transform);
+            BuildSkeletonCard(PageCard(page, 30, -202, 740, 150, "SKELETON LOADER").transform);
+            BuildShaderTiles(PageCard(page, 30, -364, 740, 192, "CUSTOM uGUI SHADERS").transform);
         }
 
         // ---------------- progress ----------------
@@ -30,18 +32,18 @@ namespace EasyStateful.Samples.Showcase
             UI.Stretch(root);
             _progress = root.gameObject.AddComponent<StatefulRoot>();
 
-            _progressPct = UI.Label("Pct", root, "0%", 20, Palette.Text, TextAlignmentOptions.Right, FontStyles.Bold);
-            UI.At(_progressPct.rectTransform, -18, -34, 80, 26, new Vector2(1, 1), new Vector2(1, 1));
+            _progressPct = UI.Label("Pct", root, "0%", 30, Palette.Text, TextAlignmentOptions.Right, FontStyles.Bold);
+            UI.At(_progressPct.rectTransform, -24, -12, 120, 38, new Vector2(1, 1), new Vector2(1, 1));
 
             var track = UI.Panel("Track", root, Palette.Track);
-            UI.At(track.rectTransform, 18, -78, ProgTrackW, 14, new Vector2(0, 1), new Vector2(0, 1));
+            UI.At(track.rectTransform, 24, -84, ProgTrackW, 16, new Vector2(0, 1), new Vector2(0, 1));
             track.raycastTarget = false;
             _progressFill = UI.Panel("Fill", root, Palette.Accent);
-            UI.At(_progressFill.rectTransform, 18, -78, 0, 14, new Vector2(0, 1), new Vector2(0, 1));
+            UI.At(_progressFill.rectTransform, 24, -84, 0, 16, new Vector2(0, 1), new Vector2(0, 1));
             _progressFill.raycastTarget = false;
 
             var run = UI.Panel("Run", root, Palette.Accent);
-            UI.At(run.rectTransform, 18, 20, 150, 42, new Vector2(0, 0), new Vector2(0, 0));
+            UI.At(run.rectTransform, 24, 24, 156, 44, new Vector2(0, 0), new Vector2(0, 0));
             UI.MakeButton(run, RunProgress);
             var rl = UI.Label("L", run.transform, "Run", 15, Palette.Hex("#0D1117"), TextAlignmentOptions.Center, FontStyles.Bold);
             UI.Stretch(rl.rectTransform);
@@ -53,6 +55,7 @@ namespace EasyStateful.Samples.Showcase
             });
             _progress.LoadFromAsset(_progress.statefulDataAsset);
             _progress.SnapToState("Empty");
+            SetEase(_progress, Ease.OutCubic);
         }
 
         void RunProgress()
@@ -61,78 +64,94 @@ namespace EasyStateful.Samples.Showcase
             _progress.TweenToState(_progressFull ? "Full" : "Empty", 1.1f, Ease.OutCubic);
         }
 
-        // ---------------- skeleton loader ----------------
+        // ---------------- skeleton loader (crossfade) ----------------
         void BuildSkeletonCard(Transform card)
         {
             var root = UI.Rect("Skeleton", card);
             UI.Stretch(root);
             _skeleton = root.gameObject.AddComponent<StatefulRoot>();
-            var shimmer = Mat("EasyStateful/UIShimmer");
 
-            // bones
+            // skeleton bones (shimmering placeholders) — gentle, slow sheen
             var bones = UI.Rect("Bones", root);
-            UI.At(bones, 0, 0, 365, 150);
-            var avatar = UI.Panel("BoneAvatar", bones, Palette.Track, circle: true);
-            UI.At(avatar.rectTransform, 24, -46, 48, 48, new Vector2(0, 1), new Vector2(0, 1));
-            if (shimmer != null) avatar.material = shimmer;
+            UI.At(bones, 0, 0, 740, 150);
+            bones.gameObject.AddComponent<CanvasGroup>();
+            var bAvatar = UI.Panel("BoneAvatar", bones, Palette.Track, circle: true);
+            UI.At(bAvatar.rectTransform, 28, -50, 54, 54, new Vector2(0, 1), new Vector2(0, 1));
+            TuneSkeletonShimmer(bAvatar);
+            float[] widths = { 360, 300, 220 };
             for (int i = 0; i < 3; i++)
             {
                 var bar = UI.Panel($"Bone{i}", bones, Palette.Track);
-                UI.At(bar.rectTransform, 86, -42 - i * 26, 240 - i * 50, 14, new Vector2(0, 1), new Vector2(0, 1));
-                if (shimmer != null) bar.material = shimmer;
+                UI.At(bar.rectTransform, 102, -44 - i * 28, widths[i], 16, new Vector2(0, 1), new Vector2(0, 1));
+                TuneSkeletonShimmer(bar);
             }
 
             // loaded content
             var loaded = UI.Rect("Loaded", root);
-            UI.At(loaded, 0, 0, 365, 150);
+            UI.At(loaded, 0, 0, 740, 150);
+            loaded.gameObject.AddComponent<CanvasGroup>();
             var av = UI.Panel("Avatar", loaded, Palette.Purple, circle: true);
-            UI.At(av.rectTransform, 24, -46, 48, 48, new Vector2(0, 1), new Vector2(0, 1));
-            var name = UI.Label("Name", loaded, "Ada Lovelace", 17, Palette.Text, TextAlignmentOptions.Left, FontStyles.Bold);
-            UI.At(name.rectTransform, 86, -42, 240, 24, new Vector2(0, 1), new Vector2(0, 1));
-            var role = UI.Label("Role", loaded, "Engineer · online now", 14, Palette.Green, TextAlignmentOptions.Left);
-            UI.At(role.rectTransform, 86, -70, 240, 22, new Vector2(0, 1), new Vector2(0, 1));
+            UI.At(av.rectTransform, 28, -50, 54, 54, new Vector2(0, 1), new Vector2(0, 1));
+            var name = UI.Label("Name", loaded, "Ada Lovelace", 18, Palette.Text, TextAlignmentOptions.Left, FontStyles.Bold);
+            UI.At(name.rectTransform, 102, -44, 360, 26, new Vector2(0, 1), new Vector2(0, 1));
+            var role = UI.Label("Role", loaded, "Engineer · online now", 15, Palette.Green, TextAlignmentOptions.Left);
+            UI.At(role.rectTransform, 102, -74, 360, 22, new Vector2(0, 1), new Vector2(0, 1));
+            var blurb = UI.Label("Blurb", loaded, "Crossfaded in by tweening two CanvasGroups.", 13, Palette.TextDim, TextAlignmentOptions.Left);
+            UI.At(blurb.rectTransform, 102, -100, 520, 20, new Vector2(0, 1), new Vector2(0, 1));
 
             var btn = UI.Panel("Load", root, Palette.Track);
-            UI.At(btn.rectTransform, 18, 18, 150, 40, new Vector2(0, 0), new Vector2(0, 0));
+            UI.At(btn.rectTransform, -24, 18, 150, 40, new Vector2(1, 0), new Vector2(1, 0));
             UI.MakeButton(btn, ToggleSkeleton);
             var bl = UI.Label("L", btn.transform, "Reload", 14, Palette.Text, TextAlignmentOptions.Center, FontStyles.Bold);
             UI.Stretch(bl.rectTransform);
 
             _skeleton.statefulDataAsset = Data(new List<State>
             {
-                St("Loading", P("Bones", "", "m_IsActive", 1f), P("Loaded", "", "m_IsActive", 0f),
-                    P("Loaded", TRANSFORM, "m_LocalScale.x", 0.96f), P("Loaded", TRANSFORM, "m_LocalScale.y", 0.96f)),
-                St("Done", P("Bones", "", "m_IsActive", 0f), P("Loaded", "", "m_IsActive", 1f),
+                St("Loading",
+                    P("Bones", CANVASGROUP, "alpha",1f),
+                    P("Loaded", CANVASGROUP, "alpha",0f),
+                    P("Loaded", TRANSFORM, "m_LocalScale.x", 0.97f), P("Loaded", TRANSFORM, "m_LocalScale.y", 0.97f)),
+                St("Done",
+                    P("Bones", CANVASGROUP, "alpha",0f),
+                    P("Loaded", CANVASGROUP, "alpha",1f),
                     P("Loaded", TRANSFORM, "m_LocalScale.x", 1f), P("Loaded", TRANSFORM, "m_LocalScale.y", 1f)),
             });
             _skeleton.LoadFromAsset(_skeleton.statefulDataAsset);
             _skeleton.SnapToState("Loading");
+            SetEase(_skeleton, Ease.OutCubic);
+        }
+
+        void TuneSkeletonShimmer(Image img)
+        {
+            var m = ApplyMat(img, "EasyStateful/UIShimmer");
+            if (m == null) return;
+            m.SetFloat("_Speed", 0.35f);  // calmer than the default sweep
+            m.SetFloat("_Shine", 0.4f);
+            m.SetFloat("_Width", 5.5f);
         }
 
         void ToggleSkeleton()
         {
             _loaded = !_loaded;
-            _skeleton.TweenToState(_loaded ? "Done" : "Loading", 0.35f, Ease.OutBack);
+            _skeleton.TweenToState(_loaded ? "Done" : "Loading", 0.45f, Ease.OutCubic);
         }
 
         // ---------------- shader tiles ----------------
         void BuildShaderTiles(Transform card)
         {
             var aurora = UI.Panel("AuroraTile", card, Color.white);
-            UI.At(aurora.rectTransform, 18, -44, 340, 196, new Vector2(0, 1), new Vector2(0, 1));
-            var am = Mat("EasyStateful/UIAurora");
-            if (am != null) aurora.material = am;
+            UI.At(aurora.rectTransform, 24, -42, 336, 138, new Vector2(0, 1), new Vector2(0, 1));
+            ApplyMat(aurora, "EasyStateful/UIAurora");
             aurora.raycastTarget = false;
-            var al = UI.Label("L", aurora.transform, "UIAurora\nanimated gradient", 16, Color.white, TextAlignmentOptions.BottomLeft, FontStyles.Bold);
-            UI.At(al.rectTransform, 16, 14, 300, 50, new Vector2(0, 0), new Vector2(0, 0));
+            var al = UI.Label("L", aurora.transform, "UIAurora · animated gradient", 15, Color.white, TextAlignmentOptions.BottomLeft, FontStyles.Bold);
+            UI.At(al.rectTransform, 16, 14, 300, 24, new Vector2(0, 0), new Vector2(0, 0));
 
             var shim = UI.Panel("ShimmerTile", card, Palette.Accent);
-            UI.At(shim.rectTransform, 382, -44, 340, 196, new Vector2(0, 1), new Vector2(0, 1));
-            var sm = Mat("EasyStateful/UIShimmer");
-            if (sm != null) shim.material = sm;
+            UI.At(shim.rectTransform, 380, -42, 336, 138, new Vector2(0, 1), new Vector2(0, 1));
+            ApplyMat(shim, "EasyStateful/UIShimmer");
             shim.raycastTarget = false;
-            var sl = UI.Label("L", shim.transform, "UIShimmer\nmoving sheen", 16, Palette.Hex("#0D1117"), TextAlignmentOptions.BottomLeft, FontStyles.Bold);
-            UI.At(sl.rectTransform, 16, 14, 300, 50, new Vector2(0, 0), new Vector2(0, 0));
+            var sl = UI.Label("L", shim.transform, "UIShimmer · moving sheen", 15, Palette.Hex("#0D1117"), TextAlignmentOptions.BottomLeft, FontStyles.Bold);
+            UI.At(sl.rectTransform, 16, 14, 300, 24, new Vector2(0, 0), new Vector2(0, 0));
         }
 
         // live progress readout

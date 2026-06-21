@@ -54,6 +54,8 @@ namespace EasyStateful.Samples.Showcase
         TextMeshProUGUI _toastLabel;
         bool _drawerOpen, _modalOpen, _fabOpen, _toastShown;
         float _toastHideAt;
+        readonly StatefulRoot[] _drawerToggles = new StatefulRoot[4];
+        readonly bool[] _drawerOn = { true, false, true, false };
 
         void Awake()
         {
@@ -72,7 +74,7 @@ namespace EasyStateful.Samples.Showcase
             var bg = UI.Panel("Showcase_BG", canvas, Color.white, rounded: false);
             bg.sprite = UI.Round; bg.type = Image.Type.Simple;
             var aurora = Mat("EasyStateful/UIAurora");
-            if (aurora != null) bg.material = aurora;
+            if (aurora != null) { bg.material = aurora; bg.gameObject.AddComponent<ShaderTime>(); }
             else bg.sprite = UI.VerticalGradient(Palette.Hex("#141A23"), Palette.Hex("#070A0E"));
             bg.raycastTarget = false;
             UI.Stretch(bg.rectTransform);
@@ -101,7 +103,7 @@ namespace EasyStateful.Samples.Showcase
             BuildLayoutPage(MakePage(2));
             BuildEffectsPage(MakePage(3));
 
-            BuildFab(content);
+            BuildFab(window.transform);
             BuildModal(window.transform);
             BuildToast(window.transform);
             BuildDrawer(window.transform);
@@ -125,6 +127,7 @@ namespace EasyStateful.Samples.Showcase
             // Keep currentStateIndex in sync (Center=0, Right=2) so StatefulRoot's own
             // first-frame inspector-sync doesn't yank every page back to state 0.
             sr.currentStateIndex = index == 0 ? 0 : 2;
+            SetEase(sr, Ease.OutCubic);
             _pages.Add(sr);
             return page;
         }
@@ -142,8 +145,7 @@ namespace EasyStateful.Samples.Showcase
 
             var logo = UI.Panel("Logo", rail.transform, Palette.Accent);
             UI.At(logo.rectTransform, 24, -34, 26, 26, new Vector2(0, 1), new Vector2(0, 1));
-            var shimmer = Mat("EasyStateful/UIShimmer");
-            if (shimmer != null) logo.material = shimmer;
+            ApplyMat(logo, "EasyStateful/UIShimmer");
             var word = UI.Label("Word", rail.transform, "Easy\nStateful", 19, Palette.Text,
                 TextAlignmentOptions.TopLeft, FontStyles.Bold);
             word.lineSpacing = -8;
@@ -175,6 +177,7 @@ namespace EasyStateful.Samples.Showcase
             _navSel.statefulDataAsset = Data(states);
             _navSel.LoadFromAsset(_navSel.statefulDataAsset);
             _navSel.SnapToState("Nav0");
+            SetEase(_navSel, Ease.OutCubic);
 
             var foot = UI.Label("RailFoot", rail.transform, "v1 · states + tweens", 11, Palette.TextDim,
                 TextAlignmentOptions.Left);
@@ -228,54 +231,61 @@ namespace EasyStateful.Samples.Showcase
         {
             ("T", Palette.Accent), ("D", Palette.Purple), ("M", Palette.Green),
         };
+        static readonly string[] FabLabels = { "Show toast", "Open dialog", "Open menu" };
 
-        void BuildFab(Transform content)
+        void BuildFab(Transform parent)
         {
-            var root = UI.Rect("Fab", content);
-            UI.At(root, -28, 26, 64, 260, new Vector2(1, 0), new Vector2(1, 0));
+            // Full-window root so the speed-dial gets its own dimming backdrop.
+            var root = UI.Rect("Fab", parent);
+            UI.Stretch(root);
             _fab = root.gameObject.AddComponent<StatefulRoot>();
 
-            // mini actions (added first → behind main)
+            var scrim = UI.Panel("Scrim", root, new Color(0, 0, 0, 0.66f), rounded: false);
+            UI.Stretch(scrim.rectTransform);
+            UI.MakeButton(scrim, CloseFab);
+
             System.Action[] acts = { () => { ShowToast("Hello from the FAB"); CloseFab(); },
                                      () => { OpenModal(); CloseFab(); },
                                      () => { OpenDrawer(); CloseFab(); } };
-            var states = new List<State>();
-            var closed = new List<Property>();
-            var open = new List<Property>();
+            var closed = new List<Property> { P("Main/Plus", TRANSFORM, "localEulerAngles.z", 0f),
+                                              P("Scrim", "", "m_IsActive", 0f), P("Scrim", IMAGE, "m_Color.a", 0f) };
+            var open = new List<Property> { P("Main/Plus", TRANSFORM, "localEulerAngles.z", 135f),
+                                            P("Scrim", "", "m_IsActive", 1f), P("Scrim", IMAGE, "m_Color.a", 0.66f) };
             for (int i = 0; i < 3; i++)
             {
-                int idx = i;
                 var mini = UI.Panel($"Mini{i}", root, FabActions[i].color, circle: true);
-                UI.At(mini.rectTransform, 0, 6, 46, 46, new Vector2(0.5f, 0), new Vector2(0.5f, 0));
+                UI.At(mini.rectTransform, -58, 56, 46, 46, new Vector2(1, 0), new Vector2(0.5f, 0.5f));
                 mini.transform.localScale = Vector3.zero;
                 UI.MakeButton(mini, acts[i]);
-                var ml = UI.Label("L", mini.transform, FabActions[i].label, 18, Palette.Hex("#0D1117"),
-                    TextAlignmentOptions.Center, FontStyles.Bold);
+                var ml = UI.Label("L", mini.transform, FabActions[i].label, 18, Palette.Hex("#0D1117"), TextAlignmentOptions.Center, FontStyles.Bold);
                 UI.Stretch(ml.rectTransform);
+                // descriptive label pill to the left (child of the mini → inherits its pop-in scale)
+                var pill = UI.Panel("Pill", mini.transform, Palette.Hex("#161B22"));
+                UI.At(pill.rectTransform, -86, 0, 112, 32);
+                pill.raycastTarget = false;
+                var pl = UI.Label("PL", pill.transform, FabLabels[i], 13, Palette.Text, TextAlignmentOptions.Center, FontStyles.Bold);
+                UI.Stretch(pl.rectTransform);
 
-                closed.Add(P($"Mini{i}", RECT, "m_AnchoredPosition.y", 6f));
+                closed.Add(P($"Mini{i}", RECT, "m_AnchoredPosition.y", 56f));
                 closed.Add(P($"Mini{i}", TRANSFORM, "m_LocalScale.x", 0f));
                 closed.Add(P($"Mini{i}", TRANSFORM, "m_LocalScale.y", 0f));
-                open.Add(P($"Mini{i}", RECT, "m_AnchoredPosition.y", 74f + i * 62f));
+                open.Add(P($"Mini{i}", RECT, "m_AnchoredPosition.y", 130f + i * 64f));
                 open.Add(P($"Mini{i}", TRANSFORM, "m_LocalScale.x", 1f));
                 open.Add(P($"Mini{i}", TRANSFORM, "m_LocalScale.y", 1f));
             }
 
             var main = UI.Panel("Main", root, Palette.Accent, circle: true);
-            UI.At(main.rectTransform, 0, 0, 60, 60, new Vector2(0.5f, 0), new Vector2(0.5f, 0));
+            UI.At(main.rectTransform, -58, 56, 60, 60, new Vector2(1, 0), new Vector2(0.5f, 0.5f));
             UI.MakeButton(main, ToggleFab);
             var plus = UI.Rect("Plus", main.transform);
             UI.At(plus, 0, 0, 30, 30);
             var h = UI.Panel("H", plus, Palette.Hex("#0D1117"), rounded: false); UI.At(h.rectTransform, 0, 0, 22, 3); h.raycastTarget = false;
             var v = UI.Panel("V", plus, Palette.Hex("#0D1117"), rounded: false); UI.At(v.rectTransform, 0, 0, 3, 22); v.raycastTarget = false;
 
-            closed.Add(P("Main/Plus", TRANSFORM, "localEulerAngles.z", 0f));
-            open.Add(P("Main/Plus", TRANSFORM, "localEulerAngles.z", 135f));
-            states.Add(St("Closed", closed.ToArray()));
-            states.Add(St("Open", open.ToArray()));
-            _fab.statefulDataAsset = Data(states);
+            _fab.statefulDataAsset = Data(new List<State> { St("Closed", closed.ToArray()), St("Open", open.ToArray()) });
             _fab.LoadFromAsset(_fab.statefulDataAsset);
             _fab.SnapToState("Closed");
+            SetEase(_fab, Ease.OutBack);
         }
 
         void ToggleFab()
@@ -301,21 +311,21 @@ namespace EasyStateful.Samples.Showcase
             var o = dialog.gameObject.AddComponent<Outline>();
             o.effectColor = Palette.Border; o.effectDistance = new Vector2(1, -1);
 
-            var t = UI.Label("T", dialog.transform, "Delete this file?", 21, Palette.Text, TextAlignmentOptions.TopLeft, FontStyles.Bold);
+            var t = UI.Label("T", dialog.transform, "Publish your changes?", 21, Palette.Text, TextAlignmentOptions.TopLeft, FontStyles.Bold);
             UI.At(t.rectTransform, 28, -26, 324, 30, new Vector2(0, 1), new Vector2(0, 1));
-            var b = UI.Label("B", dialog.transform, "This action can’t be undone. The file will\nbe permanently removed.", 15, Palette.TextDim, TextAlignmentOptions.TopLeft);
+            var b = UI.Label("B", dialog.transform, "Your followers get notified right away.\nDon’t worry — you can undo it anytime.", 15, Palette.TextDim, TextAlignmentOptions.TopLeft);
             UI.At(b.rectTransform, 28, -66, 324, 60, new Vector2(0, 1), new Vector2(0, 1));
 
             var cancel = UI.Panel("Cancel", dialog.transform, Palette.Track);
             UI.At(cancel.rectTransform, -150, 28, 120, 44, new Vector2(0.5f, 0), new Vector2(0.5f, 0));
             UI.MakeButton(cancel, CloseModal);
-            var cl = UI.Label("L", cancel.transform, "Cancel", 15, Palette.Text, TextAlignmentOptions.Center, FontStyles.Bold);
+            var cl = UI.Label("L", cancel.transform, "Maybe later", 15, Palette.Text, TextAlignmentOptions.Center, FontStyles.Bold);
             UI.Stretch(cl.rectTransform);
 
-            var ok = UI.Panel("Delete", dialog.transform, Palette.Hex("#DA3633"));
+            var ok = UI.Panel("Publish", dialog.transform, Palette.Green);
             UI.At(ok.rectTransform, 150, 28, 120, 44, new Vector2(0.5f, 0), new Vector2(0.5f, 0));
-            UI.MakeButton(ok, () => { CloseModal(); ShowToast("File deleted"); });
-            var okl = UI.Label("L", ok.transform, "Delete", 15, Palette.Text, TextAlignmentOptions.Center, FontStyles.Bold);
+            UI.MakeButton(ok, () => { CloseModal(); ShowToast("Changes published"); });
+            var okl = UI.Label("L", ok.transform, "Publish", 15, Palette.Hex("#0D1117"), TextAlignmentOptions.Center, FontStyles.Bold);
             UI.Stretch(okl.rectTransform);
 
             _modal.statefulDataAsset = Data(new List<State>
@@ -331,6 +341,7 @@ namespace EasyStateful.Samples.Showcase
             });
             _modal.LoadFromAsset(_modal.statefulDataAsset);
             _modal.SnapToState("Closed");
+            SetEase(_modal, Ease.OutBack);
         }
 
         void OpenModal() { _modalOpen = true; _modal.TweenToState("Open", 0.26f, Ease.OutBack); }
@@ -357,16 +368,33 @@ namespace EasyStateful.Samples.Showcase
             var st = UI.Label("ST", sheet.transform, "Quick settings", 20, Palette.Text, TextAlignmentOptions.TopLeft, FontStyles.Bold);
             UI.At(st.rectTransform, 24, -28, 252, 30, new Vector2(0, 1), new Vector2(0, 1));
             string[] items = { "Sound effects", "Haptics", "Auto-sync", "Reduced motion" };
-            Color[] dots = { Palette.Accent, Palette.Green, Palette.Purple, Palette.Pink };
             for (int i = 0; i < items.Length; i++)
             {
+                int idx = i;
+                bool on = _drawerOn[i];
                 var row = UI.Panel($"Row{i}", sheet.transform, Palette.PanelAlt);
                 UI.At(row.rectTransform, 0, -78 - i * 52, 252, 44, new Vector2(0.5f, 1), new Vector2(0.5f, 1));
                 var l = UI.Label("L", row.transform, items[i], 15, Palette.Text, TextAlignmentOptions.Left);
-                UI.At(l.rectTransform, 16, 0, 180, 44, new Vector2(0, 0.5f), new Vector2(0, 0.5f));
-                var dot = UI.Panel("Dot", row.transform, dots[i], circle: true);
-                UI.At(dot.rectTransform, -18, 0, 12, 12, new Vector2(1, 0.5f), new Vector2(0.5f, 0.5f));
-                dot.raycastTarget = false;
+                UI.At(l.rectTransform, 16, 0, 160, 44, new Vector2(0, 0.5f), new Vector2(0, 0.5f));
+
+                var tog = UI.Panel("Tog", row.transform, on ? Palette.Green : Palette.Track);
+                UI.At(tog.rectTransform, -16, 0, 46, 24, new Vector2(1, 0.5f), new Vector2(1, 0.5f));
+                var tr = tog.gameObject.AddComponent<StatefulRoot>();
+                UI.MakeButton(tog, () => ToggleDrawerRow(idx));
+                var knob = UI.Panel("Knob", tog.transform, Color.white, circle: true);
+                UI.At(knob.rectTransform, on ? 10 : -10, 0, 18, 18); knob.raycastTarget = false;
+                tr.statefulDataAsset = Data(new List<State>
+                {
+                    St("Off", P("", IMAGE, "m_Color.r", Palette.Track.r), P("", IMAGE, "m_Color.g", Palette.Track.g), P("", IMAGE, "m_Color.b", Palette.Track.b),
+                        P("Knob", RECT, "m_AnchoredPosition.x", -10f)),
+                    St("On", P("", IMAGE, "m_Color.r", Palette.Green.r), P("", IMAGE, "m_Color.g", Palette.Green.g), P("", IMAGE, "m_Color.b", Palette.Green.b),
+                        P("Knob", RECT, "m_AnchoredPosition.x", 10f)),
+                });
+                tr.LoadFromAsset(tr.statefulDataAsset);
+                tr.SnapToState(on ? "On" : "Off");
+                tr.currentStateIndex = on ? 1 : 0;
+                SetEase(tr, Ease.OutBack);
+                _drawerToggles[i] = tr;
             }
             var hint = UI.Label("Hint", sheet.transform, "Tap outside to close", 12, Palette.TextDim, TextAlignmentOptions.Center);
             UI.At(hint.rectTransform, 0, 24, 252, 18, new Vector2(0.5f, 0), new Vector2(0.5f, 0));
@@ -380,6 +408,13 @@ namespace EasyStateful.Samples.Showcase
             });
             _drawer.LoadFromAsset(_drawer.statefulDataAsset);
             _drawer.SnapToState("Closed");
+            SetEase(_drawer, Ease.OutCubic);
+        }
+
+        void ToggleDrawerRow(int i)
+        {
+            _drawerOn[i] = !_drawerOn[i];
+            _drawerToggles[i].TweenToState(_drawerOn[i] ? "On" : "Off", 0.25f, Ease.OutBack);
         }
 
         void OpenDrawer() { _drawerOpen = true; _drawer.TweenToState("Open", 0.34f, Ease.OutCubic); }
@@ -410,6 +445,7 @@ namespace EasyStateful.Samples.Showcase
             });
             _toast.LoadFromAsset(_toast.statefulDataAsset);
             _toast.SnapToState("Hidden");
+            SetEase(_toast, Ease.OutBack);
         }
 
         public void ShowToast(string text)
@@ -451,6 +487,28 @@ namespace EasyStateful.Samples.Showcase
         {
             var sh = Shader.Find(shader);
             return sh != null ? new Material(sh) { hideFlags = HideFlags.DontSave } : null;
+        }
+
+        /// <summary>
+        /// The per-call ease passed to TweenToState is baked over by the property cache, so the
+        /// supported way to choose an ease is the instance override. We set it and rebuild the cache.
+        /// (Color stays Linear via the global property-override rule, so this only affects motion.)
+        /// </summary>
+        internal static void SetEase(StatefulRoot sr, Ease e)
+        {
+            sr.overrideDefaultEase = true;
+            sr.customDefaultEase = e;
+            sr.InvalidatePropertyTransitionCache();
+        }
+
+        /// <summary>Assign a custom UI shader material and drive its animated time uniform.</summary>
+        internal static Material ApplyMat(Image img, string shader)
+        {
+            var m = Mat(shader);
+            if (m == null) return null;
+            img.material = m;
+            img.gameObject.AddComponent<ShaderTime>();
+            return m;
         }
 
         Canvas EnsureCanvas()

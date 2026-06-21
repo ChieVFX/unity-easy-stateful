@@ -10,6 +10,7 @@ Shader "EasyStateful/UIShimmer"
         _Shine ("Shine Strength", Range(0,2)) = 0.6
         _Speed ("Speed", Float) = 0.6
         _Width ("Band Width", Float) = 7
+        _AnimTime ("Anim Time", Float) = 0
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -44,7 +45,7 @@ Shader "EasyStateful/UIShimmer"
 
             fixed4 _Color, _TextureSampleAdd; float4 _ClipRect;
             sampler2D _MainTex; float4 _MainTex_ST;
-            float _Shine, _Speed, _Width;
+            float _Shine, _Speed, _Width, _AnimTime;
 
             v2f vert(appdata_t v)
             {
@@ -63,7 +64,7 @@ Shader "EasyStateful/UIShimmer"
 
                 // Diagonal gaussian band sweeping across the surface.
                 float phase = IN.texcoord.x * 0.65 + IN.texcoord.y * 0.35;
-                float sweep = frac(phase - _Time.y * _Speed);
+                float sweep = frac(phase - _AnimTime * _Speed);
                 float band = exp(-pow((sweep - 0.5) * _Width, 2.0));
                 col.rgb += band * _Shine * tex.a * col.a;
 

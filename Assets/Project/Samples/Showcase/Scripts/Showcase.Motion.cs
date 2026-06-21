@@ -31,19 +31,25 @@ namespace EasyStateful.Samples.Showcase
             for (int i = 0; i < EaseRows.Length; i++)
             {
                 float rowY = -50 - i * 58;
-                var name = UI.Label($"N{i}", card, EaseRows[i].name, 14, Palette.Text, TextAlignmentOptions.Left, FontStyles.Bold);
+                // colour lives on the label, so the moving tiles stay identical (not slider-like)
+                var name = UI.Label($"N{i}", card, EaseRows[i].name, 14, Palette.Hex(EaseRows[i].hex), TextAlignmentOptions.Left, FontStyles.Bold);
                 UI.At(name.rectTransform, 20, rowY, 120, 24, new Vector2(0, 1), new Vector2(0, 1));
 
-                var track = UI.Panel($"Track{i}", card, Palette.Track, rounded: false);
-                UI.At(track.rectTransform, 150, rowY - 18, EaseEndX + 24, 4, new Vector2(0, 1), new Vector2(0, 1));
-                track.raycastTarget = false;
+                // faint guide showing the travel path + a start/end marker (not a filled slider track)
+                var guide = UI.Panel($"Guide{i}", card, new Color(1, 1, 1, 0.05f), rounded: false);
+                UI.At(guide.rectTransform, 150, rowY - 19, EaseEndX + 26, 2, new Vector2(0, 1), new Vector2(0, 1));
+                guide.raycastTarget = false;
+                var endm = UI.Panel($"End{i}", card, new Color(1, 1, 1, 0.12f), circle: true);
+                UI.At(endm.rectTransform, 150 + EaseEndX + 13, rowY - 18, 9, 9, new Vector2(0, 1), new Vector2(0.5f, 0.5f));
+                endm.raycastTarget = false;
 
-                // the travelling dot (its own StatefulRoot so each gets its own ease)
+                // the travelling tile — its own StatefulRoot so each gets its own ease
                 var holder = UI.Rect($"Lane{i}", card);
                 UI.At(holder, 150, rowY - 6, EaseEndX + 40, 36, new Vector2(0, 1), new Vector2(0, 1));
-                var dot = UI.Panel("Dot", holder, Palette.Hex(EaseRows[i].hex), circle: true);
-                UI.At(dot.rectTransform, EaseStartX, 0, 22, 22, new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f));
-                var sr = dot.gameObject.AddComponent<StatefulRoot>();
+                var tile = UI.Panel("Tile", holder, Palette.Accent);
+                UI.At(tile.rectTransform, EaseStartX, 0, 26, 26, new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f));
+                tile.raycastTarget = false;
+                var sr = tile.gameObject.AddComponent<StatefulRoot>();
                 sr.statefulDataAsset = Data(new List<State>
                 {
                     St("Start", P("", RECT, "m_AnchoredPosition.x", EaseStartX)),
@@ -51,6 +57,7 @@ namespace EasyStateful.Samples.Showcase
                 });
                 sr.LoadFromAsset(sr.statefulDataAsset);
                 sr.SnapToState("Start");
+                SetEase(sr, EaseRows[i].ease); // each tile animates with its own curve
                 _easeDots.Add(sr);
             }
 
