@@ -13,9 +13,7 @@
       "version": "file:com.chievfx.easy-stateful",
       "depth": 0,
       "source": "embedded",
-      "dependencies": {
-        "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask"
-      }
+      "dependencies": {}
     },
     "com.chievfx.mcp": {
       "version": "file:com.chievfx.mcp",

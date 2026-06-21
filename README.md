@@ -4,7 +4,17 @@ EasyStateful can be installed via package manager. Window -> Package Manager -> 
 
 Pulling other branches/commits can be done by appending branch name, eg https://github.com/ChieVFX/unity-easy-stateful.git?path=Packages/com.chievfx.easy-stateful#r/v0_0_2
 
-Dependencies are resolved automatically by the Package Manager — Easy Stateful uses [UniTask](https://github.com/Cysharp/UniTask) for its async transitions and ships its own tween/easing engine, so there's nothing else to install.
+### Dependency: UniTask
+
+Easy Stateful uses [UniTask](https://github.com/Cysharp/UniTask) for its async transitions (it ships its own tween/easing engine, so that's the only external dependency). UniTask is **not** auto-installed — Unity's Package Manager can't resolve a git-based dependency transitively from a package — so add it to your project once:
+
+**Option A — git URL** (Window → Package Manager → + → Add package from Git url):
+
+```
+https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask
+```
+
+**Option B — OpenUPM** (if you use the OpenUPM scoped registry): install `com.cysharp.unitask`.
 
 ---
 
