@@ -39,3 +39,6 @@ sysinfo.txt
 
 # Builds
 *.apk
+.mcp.json
+Packages/com.chievfx.mcp/Tools/ChievfxMcp/
+Packages/com.chievfx.mcp/*
