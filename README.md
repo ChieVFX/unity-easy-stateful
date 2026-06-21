@@ -4,7 +4,17 @@ EasyStateful can be installed via package manager. Window -> Package Manager -> 
 
 Pulling other branches/commits can be done by appending branch name, eg https://github.com/ChieVFX/unity-easy-stateful.git?path=Assets/Project#r/v0_0_2
 
-You should also install DoTween(free version), as for now this package depends on it for tweening.
+Dependencies are resolved automatically by the Package Manager — Easy Stateful uses [UniTask](https://github.com/Cysharp/UniTask) for its async transitions and ships its own tween/easing engine, so there's nothing else to install.
+
+---
+
+## 📦 Samples
+
+Import from **Window → Package Manager → Easy Stateful → Samples**, then open a scene and press **Play**.
+
+* **Basic Example** — the minimal setup: a `StatefulRoot` with a few states and runtime `TweenToState` transitions.
+* **Showcase** — a small multi-page demo app built entirely from `StatefulRoot` widgets: a segmented control with a morphing hero, animated toggle / checkbox / star-rating / stepper, an accordion, a slide-in drawer, toast, modal, a FAB speed-dial, a side-by-side **easing comparison** lab, custom uGUI shaders (animated gradient + shimmer), a skeleton→content loader, and a **hologram materialize** effect — the last one driven by tweening a *custom script value*, showing the engine isn't limited to built-in component properties.
+* **Performance Lab** — spawns an adjustable swarm of `StatefulRoot` objects and fires simultaneous transitions while reporting live FPS / frame-time, so you can see how the tween engine scales.
 
 
 # Easy Stateful for Unity
