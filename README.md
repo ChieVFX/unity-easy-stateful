@@ -1,8 +1,8 @@
 ## Quickstart
 
-EasyStateful can be installed via package manager. Window -> Package Manager -> + -> Add package from Git url: https://github.com/ChieVFX/unity-easy-stateful.git?path=Assets/Project
+EasyStateful can be installed via package manager. Window -> Package Manager -> + -> Add package from Git url: https://github.com/ChieVFX/unity-easy-stateful.git?path=Packages/com.chievfx.easy-stateful
 
-Pulling other branches/commits can be done by appending branch name, eg https://github.com/ChieVFX/unity-easy-stateful.git?path=Assets/Project#r/v0_0_2
+Pulling other branches/commits can be done by appending branch name, eg https://github.com/ChieVFX/unity-easy-stateful.git?path=Packages/com.chievfx.easy-stateful#r/v0_0_2
 
 Dependencies are resolved automatically by the Package Manager — Easy Stateful uses [UniTask](https://github.com/Cysharp/UniTask) for its async transitions and ships its own tween/easing engine, so there's nothing else to install.
 
