@@ -14,15 +14,15 @@ namespace EasyStateful.Samples.Showcase
 
         StatefulRoot _progress; bool _progressFull;
         Image _progressFill; TextMeshProUGUI _progressPct;
-        const float ProgTrackW = 680f;
+        const float ProgTrackW = 470f;
 
         StatefulRoot _skeleton; bool _loaded;
 
         void BuildEffectsPage(RectTransform page)
         {
-            BuildProgressCard(PageCard(page, 30, -22, 740, 168, "PROGRESS").transform);
-            BuildSkeletonCard(PageCard(page, 30, -202, 740, 150, "SKELETON LOADER").transform);
-            BuildShaderTiles(PageCard(page, 30, -364, 740, 192, "CUSTOM uGUI SHADERS").transform);
+            BuildProgressCard(PageCard(page, 30, -22, 740, 116, "PROGRESS").transform);
+            BuildSkeletonCard(PageCard(page, 30, -150, 740, 150, "SKELETON LOADER").transform);
+            BuildShaderTiles(PageCard(page, 30, -312, 740, 196, "CUSTOM uGUI SHADERS").transform);
         }
 
         // ---------------- progress ----------------
@@ -32,18 +32,20 @@ namespace EasyStateful.Samples.Showcase
             UI.Stretch(root);
             _progress = root.gameObject.AddComponent<StatefulRoot>();
 
-            _progressPct = UI.Label("Pct", root, "0%", 30, Palette.Text, TextAlignmentOptions.Right, FontStyles.Bold);
-            UI.At(_progressPct.rectTransform, -24, -12, 120, 38, new Vector2(1, 1), new Vector2(1, 1));
+            // top row: percentage (caption is drawn by PageCard, top-left)
+            _progressPct = UI.Label("Pct", root, "0%", 24, Palette.Text, TextAlignmentOptions.Right, FontStyles.Bold);
+            UI.At(_progressPct.rectTransform, -22, -12, 140, 32, new Vector2(1, 1), new Vector2(1, 1));
 
+            // middle row: track on the left, Run on the right (same line — no dead space)
             var track = UI.Panel("Track", root, Palette.Track);
-            UI.At(track.rectTransform, 24, -84, ProgTrackW, 16, new Vector2(0, 1), new Vector2(0, 1));
+            UI.At(track.rectTransform, 24, -66, ProgTrackW, 16, new Vector2(0, 1), new Vector2(0, 1));
             track.raycastTarget = false;
             _progressFill = UI.Panel("Fill", root, Palette.Accent);
-            UI.At(_progressFill.rectTransform, 24, -84, 0, 16, new Vector2(0, 1), new Vector2(0, 1));
+            UI.At(_progressFill.rectTransform, 24, -66, 0, 16, new Vector2(0, 1), new Vector2(0, 1));
             _progressFill.raycastTarget = false;
 
             var run = UI.Panel("Run", root, Palette.Accent);
-            UI.At(run.rectTransform, 24, 24, 156, 44, new Vector2(0, 0), new Vector2(0, 0));
+            UI.At(run.rectTransform, -22, -52, 150, 44, new Vector2(1, 1), new Vector2(1, 1));
             UI.MakeButton(run, RunProgress);
             var rl = UI.Label("L", run.transform, "Run", 15, Palette.Hex("#0D1117"), TextAlignmentOptions.Center, FontStyles.Bold);
             UI.Stretch(rl.rectTransform);
@@ -83,6 +85,7 @@ namespace EasyStateful.Samples.Showcase
             {
                 var bar = UI.Panel($"Bone{i}", bones, Palette.Track);
                 UI.At(bar.rectTransform, 102, -44 - i * 28, widths[i], 16, new Vector2(0, 1), new Vector2(0, 1));
+                bar.sprite = UI.RoundedRect((int)widths[i], 16, 8); // crisp pill at the bar's own size (shimmer forces Simple)
                 TuneSkeletonShimmer(bar);
             }
 
@@ -148,6 +151,7 @@ namespace EasyStateful.Samples.Showcase
 
             var shim = UI.Panel("ShimmerTile", card, Palette.Accent);
             UI.At(shim.rectTransform, 380, -42, 336, 138, new Vector2(0, 1), new Vector2(0, 1));
+            shim.sprite = UI.RoundedRect(336, 138, 16); // rounded-rect shape at true aspect — Simple won't ellipse it
             ApplyMat(shim, "EasyStateful/UIShimmer");
             shim.raycastTarget = false;
             var sl = UI.Label("L", shim.transform, "UIShimmer · moving sheen", 15, Palette.Hex("#0D1117"), TextAlignmentOptions.BottomLeft, FontStyles.Bold);

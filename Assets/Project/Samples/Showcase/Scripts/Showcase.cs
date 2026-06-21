@@ -32,13 +32,14 @@ namespace EasyStateful.Samples.Showcase
         const float PAGE_W = CONTENT_W, PAGE_H = WIN_H - TOP_H; // 800 x 572
         const float SLIDE = PAGE_W + 60;
 
-        static readonly string[] NavTitles = { "Controls", "Motion", "Layout", "Effects" };
+        static readonly string[] NavTitles = { "Controls", "Motion", "Layout", "Effects", "Custom" };
         static readonly string[] NavSubs =
         {
             "Inputs that animate themselves",
             "Compare easings, side by side",
             "Reveal, expand and overlay",
             "Custom uGUI shaders & loaders",
+            "Animate your own script values",
         };
 
         // ---- shell refs ----
@@ -102,6 +103,7 @@ namespace EasyStateful.Samples.Showcase
             BuildMotionPage(MakePage(1));
             BuildLayoutPage(MakePage(2));
             BuildEffectsPage(MakePage(3));
+            BuildCustomPage(MakePage(4));
 
             BuildFab(window.transform);
             BuildModal(window.transform);
@@ -143,7 +145,7 @@ namespace EasyStateful.Samples.Showcase
             rail.rectTransform.anchoredPosition = Vector2.zero;
             _navSel = rail.gameObject.AddComponent<StatefulRoot>();
 
-            var logo = UI.Panel("Logo", rail.transform, Palette.Accent);
+            var logo = UI.Panel("Logo", rail.transform, Palette.Accent, circle: true); // Simple sprite → smooth shimmer (9-slice breaks the sweep)
             UI.At(logo.rectTransform, 24, -34, 26, 26, new Vector2(0, 1), new Vector2(0, 1));
             ApplyMat(logo, "EasyStateful/UIShimmer");
             var word = UI.Label("Word", rail.transform, "Easy\nStateful", 19, Palette.Text,
@@ -151,9 +153,12 @@ namespace EasyStateful.Samples.Showcase
             word.lineSpacing = -8;
             UI.At(word.rectTransform, 60, -28, 130, 50, new Vector2(0, 1), new Vector2(0, 1));
 
-            // selection pill (behind the items)
-            var pill = UI.Panel("NavPill", rail.transform, new Color(Palette.Accent.r, Palette.Accent.g, Palette.Accent.b, 0.16f));
-            UI.At(pill.rectTransform, 0, ItemY(0), RAIL_W - 24, 44, new Vector2(0.5f, 1), new Vector2(0.5f, 1));
+            // selection pill (behind the items) — rounded on the LEFT only and run flush to the
+            // rail's right edge, so the selected tab reads as connected to the content area.
+            const float pillLeft = 12f, pillW = RAIL_W - pillLeft;
+            var pill = UI.Panel("NavPill", rail.transform, new Color(Palette.Accent.r, Palette.Accent.g, Palette.Accent.b, 0.16f), rounded: false);
+            pill.sprite = UI.RoundedRectLeft((int)pillW, 44, 14f);
+            UI.At(pill.rectTransform, pillLeft, ItemY(0), pillW, 44, new Vector2(0, 1), new Vector2(0, 1));
             var bar = UI.Panel("Bar", pill.transform, Palette.Accent);
             UI.At(bar.rectTransform, 4, 0, 3, 22, new Vector2(0, 0.5f), new Vector2(0, 0.5f));
             bar.raycastTarget = false;
@@ -507,6 +512,9 @@ namespace EasyStateful.Samples.Showcase
             var m = Mat(shader);
             if (m == null) return null;
             img.material = m;
+            // Custom shaders sweep/gradient in UV space; a 9-sliced sprite breaks UVs into
+            // segments, so force Simple (continuous 0-1 UVs) on anything shader-driven.
+            img.type = Image.Type.Simple;
             img.gameObject.AddComponent<ShaderTime>();
             return m;
         }

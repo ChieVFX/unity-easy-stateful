@@ -25,13 +25,6 @@
       "dependencies": {},
       "hash": "f213ff497e4ff462a77319cf677cf20cc0860ca9"
     },
-    "com.handzlikchris.fastscriptreload": {
-      "version": "https://github.com/handzlikchris/FastScriptReload.git?path=Assets",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "3d9366143e462c1a9d8e810c46865a6f69eb1e16"
-    },
     "com.unity.ai.navigation": {
       "version": "2.0.12",
       "depth": 0,

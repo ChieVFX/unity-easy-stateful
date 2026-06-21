@@ -25,8 +25,7 @@ namespace EasyStateful.Samples.Showcase
         {
             var card = UI.Panel("Card", page, Palette.PanelAlt);
             UI.At(card.rectTransform, x, y, w, h, new Vector2(0, 1), new Vector2(0, 1));
-            var cap = UI.Label("Cap", card.transform, caption, 11, Palette.TextDim, TextAlignmentOptions.TopLeft, FontStyles.Bold);
-            UI.At(cap.rectTransform, 18, -14, w - 36, 16, new Vector2(0, 1), new Vector2(0, 1));
+            CardHeader(card.transform, w, caption);
             return card;
         }
 
@@ -63,9 +62,11 @@ namespace EasyStateful.Samples.Showcase
                 _segLabels[i] = l;
             }
 
-            // morphing emblem on the right
+            // morphing emblem on the right — centered in the body (below the 34px header) of the
+            // 150-tall card: -(34 + (150-34)/2) = -92, so it no longer overlaps the header.
             var emblem = UI.Panel("Emblem", root, Palette.Accent);
-            UI.At(emblem.rectTransform, -58, -62, 78, 78, new Vector2(1, 1), new Vector2(0.5f, 0.5f));
+            UI.At(emblem.rectTransform, -58, -92, 78, 78, new Vector2(1, 1), new Vector2(0.5f, 0.5f));
+            emblem.type = Image.Type.Simple; // continuous UVs so the shimmer sweep doesn't break into 9-slice segments
             ApplyMat(emblem, "EasyStateful/UIShimmer");
             var pip = UI.Panel("Pip", emblem.transform, new Color(1, 1, 1, 0.9f), circle: true);
             UI.At(pip.rectTransform, 20, 20, 16, 16); pip.raycastTarget = false;

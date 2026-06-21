@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -114,6 +115,107 @@ namespace EasyStateful.Samples.Showcase
             rt.sizeDelta = new Vector2(w, h);
             rt.anchoredPosition = new Vector2(x, y);
             return rt;
+        }
+
+        static readonly Dictionary<string, Sprite> _roundedRects = new Dictionary<string, Sprite>();
+
+        /// <summary>
+        /// Full-rect rounded-rectangle sprite generated at an exact pixel size, for shader-driven
+        /// tiles drawn with <see cref="Image.Type.Simple"/>. A 9-sliced sprite would segment the
+        /// UVs (breaking the sweep/gradient), while stretching the shared square <see cref="Round"/>
+        /// sprite balloons the corner radius into an ellipse — so generate the shape at the right
+        /// aspect instead.
+        /// </summary>
+        public static Sprite RoundedRect(int w, int h, float radius)
+        {
+            string key = w + "x" + h + "r" + radius;
+            if (_roundedRects.TryGetValue(key, out var cached) && cached != null) return cached;
+
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[w * h];
+            float hw = w * 0.5f, hh = h * 0.5f;
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                float dx = x + 0.5f - hw, dy = y + 0.5f - hh;
+                float qx = Mathf.Abs(dx) - (hw - radius);
+                float qy = Mathf.Abs(dy) - (hh - radius);
+                float ox = Mathf.Max(qx, 0f), oy = Mathf.Max(qy, 0f);
+                float dist = Mathf.Sqrt(ox * ox + oy * oy) + Mathf.Min(Mathf.Max(qx, qy), 0f) - radius;
+                px[y * w + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(0.5f - dist) * 255));
+            }
+            tex.SetPixels32(px); tex.Apply(false);
+            var s = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f); // FullRect → Simple
+            _roundedRects[key] = s;
+            return s;
+        }
+
+        /// <summary>
+        /// Rectangle with only the TOP two corners rounded (flat bottom and sides) — for a card
+        /// header that meets the card's rounded top corners but stays a flat-bottomed band instead
+        /// of curling into a pill. Drawn with <see cref="Image.Type.Simple"/> at its own size.
+        /// </summary>
+        public static Sprite RoundedRectTop(int w, int h, float radius)
+        {
+            string key = "T" + w + "x" + h + "r" + radius;
+            if (_roundedRects.TryGetValue(key, out var cached) && cached != null) return cached;
+
+            float r = Mathf.Min(radius, Mathf.Min(w * 0.5f, h));
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)        // y = 0 is the bottom row, y = h-1 the top
+            for (int x = 0; x < w; x++)
+            {
+                float fx = x + 0.5f, fy = y + 0.5f;
+                float a = 1f;
+                float cy = h - r;              // arc centre height for the top corners
+                if (fy > cy && (fx < r || fx > w - r))
+                {
+                    float cx = (fx < w * 0.5f) ? r : (w - r);
+                    float dist = Mathf.Sqrt((fx - cx) * (fx - cx) + (fy - cy) * (fy - cy)) - r;
+                    a = Mathf.Clamp01(0.5f - dist);
+                }
+                px[y * w + x] = new Color32(255, 255, 255, (byte)(a * 255));
+            }
+            tex.SetPixels32(px); tex.Apply(false);
+            var s = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+            _roundedRects[key] = s;
+            return s;
+        }
+
+        /// <summary>
+        /// Rectangle with only the LEFT two corners rounded (flat right edge) — for a side-nav
+        /// selection pill that runs flush to the rail's right edge. Drawn Simple at its own size.
+        /// </summary>
+        public static Sprite RoundedRectLeft(int w, int h, float radius)
+        {
+            string key = "L" + w + "x" + h + "r" + radius;
+            if (_roundedRects.TryGetValue(key, out var cached) && cached != null) return cached;
+
+            float r = Mathf.Min(radius, Mathf.Min(w, h * 0.5f));
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                float fx = x + 0.5f, fy = y + 0.5f;
+                float a = 1f;
+                if (fx < r && (fy < r || fy > h - r))   // only the two left corners
+                {
+                    float cx = r;
+                    float cy = (fy < h * 0.5f) ? r : (h - r);
+                    float dist = Mathf.Sqrt((fx - cx) * (fx - cx) + (fy - cy) * (fy - cy)) - r;
+                    a = Mathf.Clamp01(0.5f - dist);
+                }
+                px[y * w + x] = new Color32(255, 255, 255, (byte)(a * 255));
+            }
+            tex.SetPixels32(px); tex.Apply(false);
+            var s = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+            _roundedRects[key] = s;
+            return s;
         }
 
         static Sprite MakeRounded(int size, float radius)
