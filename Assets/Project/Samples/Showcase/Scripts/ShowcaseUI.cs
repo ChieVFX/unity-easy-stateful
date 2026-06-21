@@ -18,6 +18,8 @@ namespace EasyStateful.Samples.Showcase
         public static readonly Color Green       = Hex("#3FB950");
         public static readonly Color Purple      = Hex("#A371F7");
         public static readonly Color Pink        = Hex("#F778BA");
+        public static readonly Color Gold        = Hex("#E3B341");
+        public static readonly Color Orange      = Hex("#F0883E");
 
         public static Color Hex(string s) { ColorUtility.TryParseHtmlString(s, out var c); return c; }
     }
@@ -25,13 +27,16 @@ namespace EasyStateful.Samples.Showcase
     /// <summary>Immediate helpers to assemble a clean, rounded uGUI hierarchy from code.</summary>
     public static class UI
     {
-        static Sprite _round, _circle, _triangle;
+        static Sprite _round, _circle, _triangle, _star, _check;
+        public static Sprite Check => _check != null ? _check : (_check = MakeCheck(48));
 
         /// <summary>9-sliced rounded-rect sprite (border = radius), generated procedurally.</summary>
         public static Sprite Round => _round != null ? _round : (_round = MakeRounded(48, 16f));
         public static Sprite Circle => _circle != null ? _circle : (_circle = MakeCircle(64));
         /// <summary>Downward-pointing triangle (chevron); rotate 180° to point up.</summary>
         public static Sprite Triangle => _triangle != null ? _triangle : (_triangle = MakeTriangle(40));
+        /// <summary>Five-point star (points up).</summary>
+        public static Sprite Star => _star != null ? _star : (_star = MakeStar(64));
 
         public static RectTransform Rect(string name, Transform parent)
         {
@@ -151,6 +156,72 @@ namespace EasyStateful.Samples.Showcase
             }
             tex.SetPixels32(px); tex.Apply(false);
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        static Sprite MakeStar(int size)
+        {
+            // 10 vertices alternating outer/inner radius, pointing up. 2x2 supersampled for AA.
+            var pts = new Vector2[10];
+            float cx = size * 0.5f, cy = size * 0.5f;
+            float outer = size * 0.48f, inner = outer * 0.42f;
+            for (int i = 0; i < 10; i++)
+            {
+                float ang = Mathf.PI / 2f + i * Mathf.PI / 5f; // start at top
+                float r = (i % 2 == 0) ? outer : inner;
+                pts[i] = new Vector2(cx + Mathf.Cos(ang) * r, cy + Mathf.Sin(ang) * r);
+            }
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                int hits = 0;
+                for (int sy = 0; sy < 2; sy++)
+                for (int sx = 0; sx < 2; sx++)
+                    if (InPoly(pts, x + 0.25f + sx * 0.5f, y + 0.25f + sy * 0.5f)) hits++;
+                px[y * size + x] = new Color32(255, 255, 255, (byte)(hits * 63));
+            }
+            tex.SetPixels32(px); tex.Apply(false);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        static Sprite MakeCheck(int size)
+        {
+            // Two thick segments forming a check mark.
+            Vector2 a = new Vector2(0.22f, 0.50f) * size;
+            Vector2 b = new Vector2(0.42f, 0.30f) * size;
+            Vector2 c = new Vector2(0.80f, 0.74f) * size;
+            float t = size * 0.085f;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                var p = new Vector2(x + 0.5f, y + 0.5f);
+                float d = Mathf.Min(SegDist(p, a, b), SegDist(p, b, c));
+                px[y * size + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(t - d) * 255));
+            }
+            tex.SetPixels32(px); tex.Apply(false);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        static float SegDist(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a, ap = p - a;
+            float h = Mathf.Clamp01(Vector2.Dot(ap, ab) / Vector2.Dot(ab, ab));
+            return (ap - ab * h).magnitude;
+        }
+
+        static bool InPoly(Vector2[] p, float x, float y)
+        {
+            bool inside = false;
+            for (int i = 0, j = p.Length - 1; i < p.Length; j = i++)
+                if ((p[i].y > y) != (p[j].y > y) &&
+                    x < (p[j].x - p[i].x) * (y - p[i].y) / (p[j].y - p[i].y) + p[i].x)
+                    inside = !inside;
+            return inside;
         }
 
         public static Sprite VerticalGradient(Color top, Color bottom, int h = 256)
